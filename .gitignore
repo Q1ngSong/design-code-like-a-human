@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+build/
+dist/
+
+# 虚拟环境
+.venv/
+venv/
+env/
+
+# 各类缓存
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+
+# codegraph 的索引与我们自己生成的审计报告(audit.md / audit.json 都在里面)。
+# 不带前导斜杠,所以任意层级的 .codegraph/ 都匹配,含 test_project/ 下的那个。
+# 它是派生物:删掉再跑一次 refresh.py 就回来了。
+.codegraph/
+
+# 密钥与本地配置。代价一行,防的是一旦提交就永远留在历史里的泄漏。
+.env
+.env.*
+*.pem
+*.key
+.claude/settings.local.json
+
+# 编辑器与操作系统
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# tests/ 与 pytest 配置不入库。plugin 运行只用 skills/ hooks/ scripts/,
+# 测试是开发期资产,本机保留即可,不随分发走。
+tests/
+pytest.ini
+
+# test_project/ 不入库。三层 OVAM 活体夹具,用来验证规则的漏报与误报 ——
+# 属于开发期工具,不是 plugin 的组成部分。单元测试不依赖它(全部用 tmp_path
+# 临时夹具),所以 clone 下来 pytest 照样全绿。
+test_project/
+
+# docs/ 不入库。设计文档、实施计划、验证记录、codegraph 调研笔记 ——
+# 都是本地推演过程的产物,不是 plugin 的组成部分。规范本身已经写进
+# skills/ 里的技能文档,那才是使用者需要读的东西。
+docs/
+
+# references/ 整体不入库。这是调研期的工作区:第三方克隆各自带 .git,
+# 纳入会变成损坏的 submodule;而本库要独立成型,不复用它们的任何内容。
+# 我们自己写的分析已迁到 docs/(codegraph-notes.md、codegraph-evidence/),
+# 因为 spec 直接依赖它们作为证据。
+references/

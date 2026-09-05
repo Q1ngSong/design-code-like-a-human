@@ -1,0 +1,26 @@
+{
+  "name": "design-code-like-a-human",
+  "version": "0.1.0",
+  "description": "科研原型代码的工程纪律：写之前判断该不该写、注释按标准写、实验输出和记录有定处、实验跑在分支上；十条规则机械审计。",
+  "author": {
+    "name": "YuwanZ",
+    "email": "yuw4n0@gmail.com"
+  },
+  "homepage": "https://github.com/Q1ngSong/design-code-like-a-human",
+  "repository": "https://github.com/Q1ngSong/design-code-like-a-human",
+  "license": "MIT",
+  "keywords": ["research-code", "docstring", "code-review", "experiment-tracking", "codegraph", "python"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Design Code Like a Human",
+    "shortDescription": "科研原型代码的工程纪律",
+    "longDescription": "写之前判断该不该写、注释按标准写、实验输出和记录有定处、实验跑在分支上；十条规则机械审计注释、分层依赖、死代码与变更记录。",
+    "developerName": "YuwanZ",
+    "category": "Developer Tools",
+    "capabilities": ["Interactive", "Read", "Write"],
+    "defaultPrompt": [
+      "审计这个项目的注释和边角料",
+      "我要开一组调参实验"
+    ]
+  }
+}

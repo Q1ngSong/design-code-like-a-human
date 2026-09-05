@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# 会话开始时，若当前项目启用了本规范就打一段提示；否则静默退出。
+#
+# hooks 是全局触发的：没有这道守卫，每个无关项目的每次会话都会被打扰。
+# .comment-standard.json 的存在与否就是开关，与命令用的是同一个判据。
+set -euo pipefail
+
+# 从脚本自身位置推出插件根。逐级解析软链——插件被软链安装时，
+# BASH_SOURCE 指向软链自身，直接取 dirname 会算到错误的位置。
+src="${BASH_SOURCE[0]}"
+while [ -L "$src" ]; do
+  dir="$(cd -P "$(dirname "$src")" && pwd)"
+  src="$(readlink "$src")"
+  [[ $src != /* ]] && src="$dir/$src"
+done
+plugin_root="$(cd -P "$(dirname "$src")/.." && pwd)"
+
+root="$PWD"
+while [ "$root" != "/" ]; do
+  if [ -f "$root/.comment-standard.json" ]; then
+    cat <<MSG
+本项目启用了注释标准（检测到 $root/.comment-standard.json）。
+
+写代码前走一遍 writing-minimal-code 的四道决策；docstring 的格式见
+writing-python-comments。功能跑通后用 auditing-code-comments 审计。
+
+审计命令（技能里写的是相对技能目录的 ../../scripts/refresh.py，这是绝对路径）：
+
+    python3 "$plugin_root/scripts/refresh.py" "$root"
+
+不要单独运行 codegraph sync —— 它会清空 docstring 回填结果。
+索引不用手工建，第一次跑上面这条命令时会自动建好。
+MSG
+    exit 0
+  fi
+  root="$(dirname "$root")"
+done
+exit 0

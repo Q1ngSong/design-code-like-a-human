@@ -24,7 +24,8 @@ def docstrings_for(path):
 
     Returns:
         dict,键是 def/class 所在行号(与 codegraph 的 start_line 对齐),
-        值是去缩进并 strip 过的 docstring。文件语法错误或编码异常时返回空 dict ——
+        值是 (定义名, 去缩进并 strip 过的 docstring)。带名字是为了让 run
+        能核对索引里那一行确实还是这个定义。文件语法错误或编码异常时返回空 dict ——
         原型代码经常处于半成品状态,不应因此中断整次回填。
     """
     try:
@@ -36,7 +37,7 @@ def docstrings_for(path):
         if isinstance(node, _DOCUMENTED):
             doc = ast.get_docstring(node)
             if doc:
-                out[node.lineno] = doc.strip()
+                out[node.lineno] = (node.name, doc.strip())
     return out
 
 
@@ -57,25 +58,27 @@ def run(proj, only=None):
     con = sqlite3.connect(proj.db_path)
     try:
         rows = con.execute(
-            "SELECT id, file_path, start_line FROM nodes"
+            "SELECT id, file_path, start_line, name FROM nodes"
             " WHERE kind IN ('function','method','class') AND file_path LIKE '%.py'"
         ).fetchall()
 
         by_file = {}
-        for node_id, file_path, start_line in rows:
+        for node_id, file_path, start_line, name in rows:
             if only is not None and file_path not in only:
                 continue
             if not proj.in_scope(file_path):
                 continue
-            by_file.setdefault(file_path, []).append((node_id, start_line))
+            by_file.setdefault(file_path, []).append((node_id, start_line, name))
 
         updates = []
         for file_path, nodes in by_file.items():
             docs = docstrings_for(proj.root / file_path)
-            for node_id, start_line in nodes:
-                doc = docs.get(start_line)
-                if doc:
-                    updates.append((doc, node_id))
+            for node_id, start_line, name in nodes:
+                hit = docs.get(start_line)
+                # 索引过时时,同一行号可能已经是另一个函数:名字对不上就不写,
+                # 否则 g 的 docstring 会挂到索引里的 f 头上,图规则读到错的角色标记。
+                if hit and hit[0] == name:
+                    updates.append((hit[1], node_id))
 
         con.executemany("UPDATE nodes SET docstring = ? WHERE id = ?", updates)
         con.commit()

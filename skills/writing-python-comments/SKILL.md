@@ -25,6 +25,11 @@ description: Use together with writing-minimal-code whenever writing or editing 
 书写量随函数接口自动伸缩:无参数无返回值的一行即合格,有参数就每个参数一条,
 有返回值就一条 Returns。私有函数也不豁免。
 
+**例外是最外层。** 声明了两层以上时,`layers` 末项(可以是多个目录)里的函数
+只要摘要行和角色标记,不要求 `Args`/`Returns`——没有内层依赖那一层,调用方只在
+同层,读者就是写它的人,逐参数介绍对他没有信息量,审计规则 R4/R5/R6 也不查那里。
+单层项目没有最外层,全部按最严的写。
+
 **Python 特殊方法不用写。** 两端双下划线的方法——`__init__`、`__call__`、
 `__len__` 这类——行为由语言规定，审计规则也跳过它们。给 `__init__` 写一遍
 「Args: 构造参数」是重复信息。
@@ -50,7 +55,7 @@ description: Use together with writing-minimal-code whenever writing or editing 
 |---|---|---|
 | `[主线]` | 本次实验的核心路径 | R3 会检查它有没有调用旁支 |
 | `[旁支]` | 静态可达但不在主线上 | 审计时要回答「本次实验用得到吗」 |
-| `[基础设施]` | logging / config / io 等底座 | 不参与边角料判断 |
+| `[基础设施]` | logging / config / io 等底座 | 没有规则特殊对待它；没人调用照报 R1 |
 | `[一次性]` | 探针、临时脚本 | 必须位于最外层;R1 不报它零调用者 |
 
 ## 正文

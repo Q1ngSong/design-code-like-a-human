@@ -55,4 +55,4 @@ docs/
 # 纳入会变成损坏的 submodule;而本库要独立成型,不复用它们的任何内容。
 # 我们自己写的分析已迁到 docs/(codegraph-notes.md、codegraph-evidence/),
 # 因为 spec 直接依赖它们作为证据。
-references/
+references_proj/

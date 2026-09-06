@@ -25,6 +25,7 @@ class Finding:
     line: int
     name: str
     message: str
+    changed: bool = False   # 差异审阅:是否落在相对 base 改过的函数上。cli 打标,规则不填
 
 
 def check_file(path, rel, contract=True):
@@ -109,9 +110,8 @@ def check_project(proj):
     不会被别人调,逐参数介绍是负担而非信息。
     """
     out = []
-    for path in sorted(proj.root.rglob("*.py")):
-        rel = path.relative_to(proj.root).as_posix()
-        if not proj.in_scope(rel) or proj.is_vendored(rel):
+    for rel in proj.py_files_in_scope():
+        if proj.is_vendored(rel):
             continue
-        out += check_file(path, rel, contract=not proj.is_outermost(rel))
+        out += check_file(proj.root / rel, rel, contract=not proj.is_outermost(rel))
     return sorted(out, key=lambda f: (f.file, f.line, f.rule))

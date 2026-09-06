@@ -20,10 +20,12 @@ git checkout -b exp/ablation_study/lora_rank
 
     分支    exp/ablation_study/lora_rank
     输出    runs/ablation_study/lora_rank/{task}/
-    记录    experiments/lora_rank.csv
+    记录    experiments/ablation_study/lora_rank.csv
 
 带上章节那一层是为了防撞名——`main_results/baseline` 和 `badcases/baseline`
-是两组不同的实验。
+是两组不同的实验。**三处都带**:记录的路径照抄输出目录去掉 `runs/` 和叶子,
+和 stash message 是同一条规则。CSV 入库了,两组 `baseline` 写进同一个文件
+就是真实的合并冲突。
 
 **「一组」有多大、要不要新开分支，你自己判断。** 判据是：这些实验会不会
 放在一起比较。几次相关的调参是一组，换个方向就该另起一组。
@@ -39,34 +41,41 @@ exp: 开一组 —— LoRA rank 扫描
 
 ## commit 的粒度是一次决策，不是一次运行
 
-**逐次自适应调参** —— 上次结果决定下次试什么。一次一个 commit,
-message 里写清为什么试这个值，那句话就是推理链条：
+**逐次自适应调参** —— 上次结果决定下次试什么。一次一个 commit：
 
 ```
-exp: rank=8 → FID 12.3 —— 有效,+0.4 分
-exp: rank=16 → FID 11.9 —— 有效但收益递减
-exp: rank=32 → FID 14.1 —— 过拟合,回退
+exp: rank8_lr1e-4_round1 —— keep
+exp: rank16_lr1e-4_round1 —— keep
+exp: rank32_lr1e-4_round1 —— discard
 ```
+
+**第一行只要 task 名和一个词的结果。** task 名是三个月后找回这次代码的唯一线索；
+那个词让 `git log --oneline` 扫一眼就知道哪次赢了。为什么试、指标多少、输出在哪，
+CSV 那行里有，和代码在同一个 commit 里，第一行不再抄。
+
+**正文留给决策。** 放弃一个方向、人工改判、收尾定配置——这些是决策不是数据，
+理由写进 commit 正文（`git commit -m "第一行" -m "正文"`），`git log` 读下来
+就是决策链。和 CSV `结论` 列是同一段话，两处都有：CSV 是表，git log 是叙事。
 
 **脚本批量扫** —— 一次 `for rank in [4,8,16,32]` 全跑完。这是**一个决策**,
-一个 commit 就够，不要假装成四次：
+一个 commit 就够，不要假装成四次。message 把四个 task 名都列上，
+将来 grep 任何一个都能找到：
 
 ```
-exp: 扫描 rank 4/8/16/32,定在 16
+exp: rank4 rank8 rank16 rank32 —— 定在 16
 ```
 
-每次 commit 前先按 `recording-experiment-results` 往这组的 CSV 里补一行，
-`task` 列用输出目录的叶子名（`rank8_lr1e-4_round1` 这种），和 `runs/` 对得上。
-
-**`git 版本` 那列在 commit 之后填。** 提交号要提交完才有：
+**一次决策一个 commit，代码和 CSV 那行一起：**
 
 ```bash
-git commit -m "exp: rank=8 → FID 12.3 —— 有效，+0.4 分"
-git rev-parse --short HEAD          # 把它写进 CSV 这一行的 git 版本列
+# 跑完，CSV 追加一行，然后：
+git add train.py experiments/ablation_study/lora_rank.csv
+git commit -m "exp: rank8_lr1e-4_round1 —— keep"
 ```
 
-顺序是：跑完 → 写 CSV 前五列 → commit → 回填提交号。
-提交号指向的正是产生这一行结果的那份代码，`git checkout <提交号>` 能重跑。
+找回来：`git log --all --grep=rank8_lr1e-4_round1 --source`，`%S` 列就是它在哪条分支。
+顺序是：跑完 → 写 CSV 行（`task` 用输出目录的叶子名，其余列见
+`recording-experiment-results`）→ 一个 commit。做完工作区是干净的。
 
 ## 调优期：快速迭代模式
 
@@ -80,40 +89,80 @@ git rev-parse --short HEAD          # 把它写进 CSV 这一行的 git 版本�
 分支就成了一百格的废墟，理解负担比失败本身还重。所以：
 
 ```
-改代码 → git commit -m "exp: lr 0.04" → 跑
-  变好了 → 追加 CSV 行（结论 keep，提交号 = 刚才那个），分支前进
-  没变好 → h=$(git rev-parse --short HEAD)
-           git update-ref refs/tried/$h HEAD        # 钉住
-           git reset --hard HEAD~1                  # 清掉
-           追加 CSV 行（结论 discard，提交号 = $h）
+开跑前 → grep "^<task>," experiments/<section>/<setting>.csv   # 本组试过就换 task
+       → CSV 追加一行：task、简介 填好，指标、结论 留空        # 没试过才落盘意图
+改代码 → 审计（`--base HEAD`，圈出这次的改动）→ 跑
+  变好了 → CSV 那行补上 指标，结论 = keep
+           git add -A && git commit -m "exp: lr0.04_bs4_round1 —— keep"
+  没变好 → CSV 那行补上 指标，结论 = discard
+           git add experiments/ablation_study/lora_rank.csv && git commit -m "record: lr0.04_bs4_round1 discard"
+           git stash push -u -m "ablation_study/lora_rank/lr0.04_bs4_round1"
+           # 失败的改动（含新建文件）进 stash，工作区回到起点；message = 输出目录去掉 runs/
 ```
 
-**先 commit 再跑**，跑之前就有提交号，CSV 的 `git 版本` 列有东西可填。
+**每一步归哪个技能管——按名字调，不靠它自己撞上来。**
 
-**CSV 追加就行，不 commit。** `experiments/` 和 `runs/` 一样不入库，
-`git reset --hard` 不碰 untracked 文件，上一次失败的那行不会被下一次 reset 冲走。
-（项目自己把记录文件纳入了版本控制的，每追加一行就单独 commit 一次，
-否则会被 reset 抹掉。）
+| 步骤 | 调谁 | 它管什么 |
+|---|---|---|
+| CSV 追加 / 补齐 | `recording-experiment-results` | 列的含义、失败和崩溃怎么记 |
+| 改代码 | `writing-minimal-code` | 四道闸门；新函数的 docstring 转 `writing-python-comments` |
+| 改动会写盘 | `saving-experiment-outputs` | 输出存哪；不写盘的尝试不用调 |
+| 审计 | `auditing-code-comments` | 告警怎么处置、R3/D1/C1 哪些要判断 |
 
-**`update-ref` 那行不能省。** 裸 reset 之后那个 commit 没有任何 ref 指向它，
-30 天后 gc 掉，CSV 里的提交号变成悬空指针：你知道「试过 lr 0.04 不行」，
-看不到当时改的是哪几行。**CSV 里的提交号能用，全靠这一行钉着它**——
-`git show refs/tried/<提交号>` 就是那次的完整代码。不钉就别填提交号，
-填了也是假的。
+这些技能的 description 也会按情境自动触发，那是兜底；循环里以这张表为准，
+每轮都调——它们的内容不在本技能里复制一遍，要用就调。
 
-存储不是问题：实测 28KB 的 `train.py` 钉 100 次，`git gc` 之后 `.git` 只涨 124KB，
-一个 50M 参数的 fp16 checkpoint 抵八百夜。gc 之前每次约 24KB（git 存的是
-整个文件的压缩快照，不是 diff），git 会自己在几千个松散对象时打包，不用管。`refs/tried/*` 让它永久可达，又不出现在 `git branch`
-和 `git log` 里，零噪音。差一点的那次要拿回来和别的组合，
-`git cherry-pick refs/tried/<提交号>` 就行——没有这个 ref 做不到。
+**跑前先写半行 CSV。** `task` 和 `简介` 跑之前就知道，先落盘；`指标` 和 `结论`
+跑完再填。这样任何时刻工作区里都有「正在试什么、为什么」，不靠对话记忆。
 
-**`--hard` 不能省。** 裸 `git reset HEAD~1` 只挪指针，失败的改动留在工作区，
-下一轮就叠在它上面改，失败的代码混进下一次实验。
+**跑完再 commit，不是跑前。** 尝试在工作区里跑，成了才成为 commit。所以不需要
+先 commit、不需要 `HEAD~1`、不需要 `reset --hard`——没有任何一步会退历史或抹工作区。
 
-这个模式下分支上只有赢家，一条直线。失败的经验在两处：CSV 一行（试了什么、
-得了多少、为什么弃）和 `refs/tried/` 一个 commit（当时的完整代码）。
-两处都不在 git 历史里——CSV 不入库，`refs/tried` 不进 log——所以合回主分支时
-主分支**看不到**排除过什么，要看得去 `experiments/` 翻 CSV。这是不入库的代价。
+**discard 时 CSV 先 commit，代码后 stash，顺序不能反。** 反了 CSV 行会跟着代码一起
+进 stash，分支上就没有这次的记录了。keep 时一起 commit 没有这个问题。
+
+**`stash push -u` 是先存档再清空，一条命令。** 它把工作区的改动（`-u` 连新建的
+文件一起）存成一个 commit 挂在 `refs/stash` 上，再把工作区清回 HEAD。存不成就
+不会清。message 照抄输出目录去掉 `runs/`，CSV 的 `输出目录` 列就是钥匙——
+stash 是栈，同名不覆盖，两组实验各有一个 `lr0.04` 也不撞。
+
+找回：`git stash list | grep <路径>` 定位，`git stash show -p stash@{n}` 看 diff。
+**永远按名字 grep，不写死下标**——每 push 一次，所有旧条目的下标加一。
+循环里只用 `push`；`pop`、`drop`、`clear` 是破坏性的，不用。
+默认 `git gc` 不清 stash（实测 120 天的照样在），显式 `reflog expire` 才会。
+
+存储不是问题：stash 和 commit 一样是压缩快照，实测 28KB 的 `train.py` 存 100 次，
+gc 之后 `.git` 只涨 124KB，一个 50M 参数的 fp16 checkpoint 抵八百夜。
+
+**审计放在跑之前，用 `--base HEAD`。** 那时这次的改动还没 commit，`--base HEAD`
+把落在改动上的告警（改了的函数、新文件、改动文件里的模块级语句）标成
+`changed=true`，只看这些；D3（写死的输出路径）在烧
+GPU 之前就能抓到。C1 会报这次改了的函数——函数体动了就报，改个常量也报——
+那是预期，快速迭代里不为它补 `变更:` 行；C1 只在合并前 `--base main` 那一遍才该认真看。
+
+这个模式下分支上没有失败的代码：赢家是 `exp:`（代码和 CSV 行在一起），
+输家只剩一行 `record:`。失败的经验在两处：CSV 一行（试了什么、得了多少、
+为什么弃）和 stash 一条（当时的完整改动）。
+合回主分支时 CSV 跟着 squash 进去，主分支照样知道排除过什么。
+
+**跑崩了、跑超了、跑过了——三条照 autoresearch 的做法。**
+
+- **崩溃**（OOM、NaN、栈回溯）：先看日志尾部。是 typo、漏 import 这种笨错，
+  修了直接再跑一次——还没 commit，工作区改就是；修两次还崩就当想法不行——走 discard
+  那条路（CSV、commit、stash），CSV `结论` 写 `crash：崩在哪一步、什么原因`。
+  不要为一个想法修第三次。
+- **超时**：第一轮跑的是基线，记下它用了多久。之后单次运行超过**基线两倍**
+  就 kill 掉，当 discard 处理，`结论` 写 `timeout`。autoresearch 的规矩是
+  5 分钟预算、10 分钟 kill，比例就是这个；我们不知道你的项目该跑多久，
+  但第一轮之后 agent 知道。
+- **去重**：在追加半行**之前**查，`grep "^<task>," experiments/<section>/<setting>.csv`。
+  顺序反了会查到自己刚写的半行，永远「试过」。只查本组这一个文件——
+  `-r experiments/` 会把别的组同名 task 也算上，同名不同组是两次实验不是重复。
+  命中但 `结论` 列为空，是上次没跑完留下的半行，不是试过。
+  试过的不再试——压缩之后最容易犯的就是这条，CSV 尾部就是记忆。
+
+驱动层（`program.md` 之类）自己定了超时或重试策略的，以它为准；
+这三条是没人定时的默认。
 
 **每次 discard 之后，先问这个方向还要不要继续。** 快速迭代最容易犯的错是死磕：
 lr 0.04 差了推到 0.08，还差推到 0.16，一路推下去。什么时候停，你自己判断，
@@ -128,10 +177,12 @@ lr 0.04 差了推到 0.08，还差推到 0.16，一路推下去。什么时候�
 连续三次还没改善，是该认真问上面这几条的时刻，不是自动停的信号。
 
 **放弃一个方向时，必须写方向级的结论。** 这条不是判断，是规矩。那次 discard 的
-CSV `结论` 列写的是整个方向为什么不行，不是最后一次本身：
+CSV `结论` 列和 `record:` commit 的正文，写的是整个方向为什么不行，不是最后一次本身：
 
       lr↑ 放弃（0.04/0.08/0.16，最好 1.003 仍劣于基线 0.998）——
       学习率已在稳定边界，再推只会发散
+
+      git commit -m "record: lr0.16_bs4_round1 discard" -m "lr↑ 放弃（0.04/0.08/0.16……）—— 学习率已在稳定边界，再推只会发散"
 
 三行 discard 各写各的，回头只知道三次都不行，不知道这个方向已经判死，
 下一夜的 agent 会把同一条死路再走一遍。
@@ -139,26 +190,111 @@ CSV `结论` 列写的是整个方向为什么不行，不是最后一次本身�
 为了让同方向的行能对上，`简介` 以方向开头：`lr↑: 0.08，上次 0.04 无效再推一档`。
 同前缀的行连着看，趋势就在眼前。
 
-**架构改动也走这个循环。** 失败的 diff 被 `refs/tried` 钉着，reset 掉不丢东西。
+**人工改判：指标说 discard，你觉得它才是对的。** 指标差一点但曲线更稳、
+代码更简单、在另一个指标上更好——这种权衡机器做不了，你做。想要哪次就取回来：
+
+    git stash list | grep <路径>       找到它现在的下标
+    git stash apply stash@{n}          把那次的改动叠到现在的工作区
+
+**apply 出来的是「那次的改动 + 后来所有赢家」的组合，不是那次实验本身。**
+尖端一直在动，碰同一处会冲突，手动解；不冲突也不等于当时的结果还成立。
+所以取回之后**当一次新尝试跑**：CSV 追加一行，`简介` 写「人工改判取回 <task>」，
+跑完按结果 keep 或 discard。原来那行不改——它记的是当时的结果，是对的。
+
+stash 里没有的话这一步做不了：`fatal: bad revision`。
+
+**架构改动也走这个循环。** 失败的 diff 在 stash 里，清掉不丢东西。
 "架构失败的经验更值钱"是真的，但值钱的是那份 diff 和那行方向级结论，
 不是分支上多一个 commit。快速迭代里不区分参数和结构。
 
+**开启时落一个标记，停止时删掉。** 模式不能只活在对话里——context 一压缩
+就没了，凌晨三点 agent 会重新去问人。开启时：
+
+    git check-ignore -q runs/ || echo "runs/ 没被 git 忽略，先补 .gitignore"   # output_roots 里每个都查
+    mkdir -p .codegraph
+    [ -f .codegraph/.gitignore ] || echo '*' > .codegraph/.gitignore
+    git branch --show-current > .codegraph/unattended
+
+第一行不能省：输出区没被 git 忽略，keep 的 `git add -A` 会把 checkpoint 提交进库，
+discard 的 `stash push -u` 会把整个 `runs/` 从磁盘收走。D2 在跑前审计里报得出来，
+但它是文件级的，永远不是 `changed=true`，无人值守时没人看它；这一刻你还在场，
+补 `.gitignore` 是构建期的事。第三行是给没装 codegraph 的项目的:`.codegraph/` 下的东西不被忽略,第一次 discard 的
+`stash push -u` 就会把哨兵当未跟踪文件收走,模式静默翻回有人在场。装了 codegraph
+的话它自己会写这个文件,判断一下不覆盖。
+
+**只在用户明确说要离开、让你自己跑时才落这个文件**——「开始迭代」「我去睡了」
+「跑一夜」算；「继续」「好」「行」不算，那是对上一步的回应，不是授权离场。
+拿不准就问一句「要我无人值守跑吗」，这一问值得。停止时 `rm .codegraph/unattended`，
+再跑一次 `refresh.py`——`audit.json` 的 `unattended` 是审计那一刻的快照，不会自己翻回 false。
+**文件存在且不超过 24 小时就是无人值守**；
+`refresh.py` 把它写进 `audit.json` 的 `unattended` 字段，hook 在每次会话开始
+（含压缩之后）打一行。其他技能看这两处，不自己推断。24 小时照 ARIS 的规矩：
+忘了删的哨兵不该在一周后还生效。文件里那行分支名是给人看的。
+
 **迭代期间不切回构建期。** 模式由谁在场决定，不由改动类型决定：
-无人交互就是快速迭代，一直到你叫停；你回来了、开始一起做决策了，
+无人交互就是快速迭代——其他技能里说的「无人值守」指的就是这个阶段——
+一直到你叫停；你回来了、开始一起做决策了，
 就自动回到构建期，每个决策一个 commit。中途不切换——切换的判断本身
 就是一次交互，而迭代期间没有人可交互。
+
+**无人值守期间不交出 turn。** harness 没有「循环模式」：agent 一直调工具，
+turn 就一直不结束；哪一刻输出了一段没有后续动作的总结，turn 结束，CLI 等人，
+等到天亮。所以每一步都以工具调用收尾，要说的写进 commit message 或 CSV。
+不许「问一句，没人答就继续」——要么阻塞地问（有人时），要么不问。
+
+**压缩之后从盘上恢复。** 状态全在 git 里，不需要别的状态文件：
+`git branch --show-current` 是在哪，`git log -3 --oneline` 是走到哪，
+`experiments/<路径>.csv` 尾部是试过什么，`git stash list` 是失败档案。
+第一步 `cat .codegraph/unattended`——在、且没过 24 小时，就还在无人值守
+（Claude Code 的 hook 也会说这一句；Codex 没有 hook，自己看）。然后读上面四处续上。
+
+工作区里的改动归谁，看 CSV 尾行和它的收尾做没做完：
+
+- `结论` 为空：崩在一次尝试中间，改动属于它。输出目录里指标齐了就照常补齐、
+  keep 或 discard；没跑完就按 discard 走——`结论` 写 `crash：崩在哪一步`，
+  提交 CSV，`git stash push -u`。
+- `结论` 非空但收尾没做完——keep 的 `git log --oneline --grep "<task>"` 找不到
+  commit，discard/crash 的 `git stash list | grep "<task>"` 找不到条目：崩在填结论和
+  收尾之间，改动仍属于那次，把剩下的半段做完（keep：`git add -A && git commit`；
+  discard：提交 CSV、stash）。
+- 两处都齐了，工作区还有改动，才是无关改动，按 `recording-experiment-results`
+  说的提交成 `chore:`。
+
+**前两种不要当成无关改动提交成 `chore:`**：那会把半成品推成基线，之后每次
+discard 的 stash 都回不到最后一次 keep。
 
 ## 合并前：把配置定在胜出的那次
 
 **这一步最容易漏。** squash 合的是分支**最终状态**，不是最好的那次。
 你跑完 rank=32，配置就停在 32;直接合过去，主分支带着一个已知过拟合的值。
+**全部失败时也一样**——尖端是最后那次失败的代码，直接合就把无效实现带进主分支。
 
-所以收尾要有一个 commit:
+所以收尾时把配置改到该合的状态：胜出那次，或全失败时回到基线。CSV 末尾的
+总结行和它一起提交：最后一次还没提交就一个 commit 装下；已经提交了就再提交
+一次，不 amend。理由进正文：
 
 ```bash
-# 把 config 改回 rank=16,CSV 末尾写结论
-git commit -m "exp: 收尾 —— 定在 rank=16,写结论"
+# 有赢家:把 config 改回 rank=16;CSV 末尾写结论
+git commit -m "exp: 收尾 —— 定在 rank=16" -m "16 之后收益递减,32 过拟合"
+
+# 全失败:git checkout main -- <配置文件>,回到基线;CSV 末尾写结论
+git commit -m "exp: 收尾 —— 全部无效,配置回基线" -m "rank 8/16 都劣于 4,方向放弃"
 ```
+
+快速迭代模式下配置不用改——失败的都 stash 了，尖端要么是指标最优那次，
+要么是你人工改判取回的那次，要么（全部失败时）就是基线。但两件事要做：
+对着 CSV 核一遍尖端确实是你要的那次，有人工改判的尤其要核；然后 CSV 末尾
+写这组的总结论——胜出配置、为什么、下一步——再提交一次，理由进正文。循环里
+每次都是当场提交的，胜者也往往不是最后一次（尾端多半是一条 discard 记录），
+没有可以搭的 commit；不 amend。
+
+收尾前跑一次差异审阅，看整条分支相对主分支引入了什么：
+
+    python3 <插件根>/scripts/refresh.py . --base main --json
+
+「本次改动」段里的东西是这组实验带进来的，合并前该清的清。「存量」里只过一眼
+R1：这条分支删掉的调用点会让别处没动的函数新报 R1，那也是这次带进来的，只是
+打标抓不到它；其余存量不归这次管。
 
 ## 合回主分支：压成一个 commit
 
@@ -188,8 +324,15 @@ git worktree add -b exp/badcases/guidance_scale ../proj-guidance
 两组实验各占一个目录、各自的分支，互不干扰 —— 不用来回 `checkout`,
 两边的实验可以同时跑。
 
-各组写各自的 CSV(`experiments/lora_rank.csv` / `guidance_scale.csv`),
-所以合并时不冲突。同一个配置文件两边都改也没事，只要改的不是同一行。
+各组写各自的 CSV（`experiments/ablation_study/lora_rank.csv` /
+`experiments/badcases/guidance_scale.csv`——路径照抄输出目录,所以不同组不可能同名）。
+一组一个分支、一个 worktree 一个分支——git 不允许两个 worktree 检出同一分支——
+所以两边永远写的是不同的文件，合并零冲突。要总表就把 `experiments/**/*.csv`
+全读进来。同一个配置文件两边都改也没事，只要改的不是同一行。
+
+**删 worktree 之前先把 `runs/` 挪走。** `git worktree remove` 连目录一起删，
+`runs/` 不入库没有副本，输出会随目录一起消失。`experiments/` 入库了、在分支上，
+不受影响。
 
 ## 跑砸了的分支照样合
 
@@ -205,5 +348,8 @@ exp(ablation_study): attention_dropout —— 无效,不再尝试
 不知道排除过什么，于是重新试一遍死路。长程自动任务里这个损失最大，
 没人凭记忆兜底。
 
-快速迭代模式下失败既不在分支历史里，也不随 squash 进主分支（CSV 不入库）。
-排除过什么只在 `experiments/` 的 CSV 里，主分支的 log 只有赢家。
+合之前先走「合并前」那步把配置回到基线——否则 squash 带进主分支的是最后那次
+失败的代码。合进去的 diff 只有 CSV 那几行，那正是该留下的东西。
+
+快速迭代模式下失败不在分支的代码历史里，但 `record:` commit 和 CSV 随 squash
+进主分支——排除过什么，主分支照样知道。

@@ -33,7 +33,7 @@ def sync(proj):
     path = proj.root / FILENAME
     desired = proj.codegraph
 
-    if not desired:
+    if desired is None:   # 只有「没写这个键」才不管;写了 {} 是显式回到默认,要覆盖
         if path.is_file():
             return (f"{FILENAME} 存在，但 .comment-standard.json 里没有 codegraph 段"
                     f"——它不受本工具管理，内容以磁盘上那份为准")

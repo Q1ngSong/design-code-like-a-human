@@ -26,7 +26,7 @@ from .rules_ast import Finding
 # 写盘 API → 路径参数的位置下标与关键字名。
 # 键是「点号后的最后一段 + 可选的限定前缀」,见 _call_name。
 _WRITE_APIS = {
-    "torch.save": (1, None),
+    "torch.save": (1, "f"),        # torch.save(obj, f=...) 与位置形式同义
     "np.save": (0, "file"),
     "numpy.save": (0, "file"),
     "np.savez": (0, "file"),

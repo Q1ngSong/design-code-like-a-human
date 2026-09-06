@@ -6,7 +6,7 @@ SessionStart hook 靠它判断要不要介入,命令靠它给出可操作的提�
 三个概念:
 
 **审计范围** —— 靠排除定义,不靠列举。除了实验输出区(`output_roots`)与
-`.git` / `__pycache__` 这类噪声,项目里其余一切都纳入索引与审计。
+`.git` / `__pycache__` 这类噪声,项目里其余一切都纳入审计。
 科研原型的源码不会都待在一个文件夹里,列举注定漏。
 
 **分层** —— `layers` 由核心到外围排序,顺序本身就是规则:依赖只能由外向内。
@@ -23,14 +23,14 @@ ovam,scripts 可以调 ovam,反向一律禁止。内层引用外层是模块化�
 """
 import json
 import sqlite3
+import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 CONFIG_NAME = ".comment-standard.json"
-# experiments/ 也在默认里:实验记录是产物不是代码,和 runs/ 一样不入库,
-# 放进输出区让 D2 顺带检查它有没有被 .gitignore。
-DEFAULT_OUTPUT_ROOTS = ("runs", "experiments")
+# experiments/ 不在这里:实验记录入库,它是结论不是产物。只有 runs/ 是输出区。
+DEFAULT_OUTPUT_ROOTS = ("runs",)
 
 # 任何项目都不该审计的目录,与配置无关。
 ALWAYS_EXCLUDED = frozenset({
@@ -61,23 +61,51 @@ def _top_segment(rel_path):
     return parts[0] if parts else None
 
 
-def _matches_prefix(rel_path, patterns):
-    """按路径段前缀匹配 gitignore 风格的目录模式。[基础设施]
+def _glob_regex(pat):
+    """把一条 gitignore 风格的模式编译成正则。[基础设施]
+
+    Args:
+        pat: 模式串。支持 `*`、`?`、`**`,开头 `/` 锚定根,结尾 `/` 表示目录。
+            不支持 `!` 取反。
+
+    Returns:
+        re.Pattern。语义照 gitignore:不含 `/` 的模式在任意深度匹配,含 `/` 的
+        锚定项目根;命中目录就命中它下面的一切。按段比较,`vendor_theme_mine/`
+        不会被 `vendor_theme/` 命中。
+    """
+    anchored = pat.startswith("/") or "/" in pat.strip("/")
+    dir_only = pat.endswith("/")   # `build/` 只命中目录,不命中叫 build 的文件
+    pat = pat.strip("/")
+    if pat.startswith("**/"):
+        pat, anchored = pat[3:], False
+    out, i = [], 0
+    while i < len(pat):
+        if pat.startswith("**/", i):
+            out.append("(?:[^/]+/)*"); i += 3     # 中间的 `**/`:零或多层目录
+        elif pat.startswith("**", i):
+            out.append(".*"); i += 2              # 结尾的 `/**`:下面所有
+        elif pat[i] == "*":
+            out.append("[^/]*"); i += 1
+        elif pat[i] == "?":
+            out.append("[^/]"); i += 1
+        else:
+            out.append(re.escape(pat[i])); i += 1
+    head = "^" if anchored else "^(?:.*/)?"
+    tail = "/.+$" if dir_only else "(?:/.*)?$"
+    return re.compile(head + "".join(out) + tail)
+
+
+def _matches(rel_path, patterns):
+    """路径是否命中任一 gitignore 风格模式。[基础设施]
 
     Args:
         rel_path: 相对项目根的路径。
-        patterns: 模式串,如 `static/`、`assets/theme`、`vendor/**`。
+        patterns: 模式串列表,如 `static/`、`assets/theme`、`**/vendor/**`、`*_pb2.py`。
 
     Returns:
-        bool。只处理目录前缀这一种常见形态 —— 降级路径够用,
-        精确判断交给索引。按段比较,`vendor_theme_mine/` 不会被 `vendor_theme/` 命中。
+        bool。空模式串跳过。
     """
-    parts = Path(rel_path).parts
-    for pat in patterns:
-        pat_parts = Path(pat.rstrip("/").replace("/**", "")).parts
-        if pat_parts and parts[:len(pat_parts)] == pat_parts:
-            return True
-    return False
+    return any(pat.strip() and _glob_regex(pat).match(rel_path) for pat in patterns)
 
 
 @dataclass(frozen=True)
@@ -86,8 +114,8 @@ class Project:
 
     root: Path
     db_path: Path
-    output_roots: tuple   # 实验输出区,可有多个;排除在索引与审计之外
-    layers: tuple   # 层名,由核心到外围
+    output_roots: tuple   # 实验输出区,可有多个;排除在审计之外
+    layers: tuple   # 每层一个目录名元组,由核心到外围;同一元组内的目录平级
     vendored: tuple = ()      # 第三方代码目录
     codegraph: object = None  # 写出成 codegraph.json 的内容
     _indexed: object = None      # indexed_files 的缓存,勿直接读
@@ -100,10 +128,9 @@ class Project:
         Returns:
             set[str],项目根相对路径;没有索引或表不可读时返回 None。
 
-        这是审计范围的权威来源 —— 索引是 `.gitignore`、`codegraph.json` 的
-        include/exclude、以及 codegraph 内置默认三者的最终结果。直接问它,
-        就不必重新实现一遍 gitignore 匹配,也不会与 codegraph 的看法漂移。
-        用户想指定解析哪些文件夹,写 codegraph.json 即可,我们跟着走。
+        **只用于诊断,不决定审计范围。** 索引是辅助文件:服务 codegraph 的查询和
+        图规则(R1/R2/R3/D1),不限制任何别的功能。审计范围由配置决定
+        (见 in_scope),cli 用这个集合和范围对比,索引落后于磁盘时点名列出。
         """
         if self._indexed is not None:
             return self._indexed or None
@@ -121,7 +148,7 @@ class Project:
         return self._indexed or None
 
     def in_scope(self, rel_path):
-        """判断路径是否纳入索引与审计。[主线]
+        """判断路径是否纳入审计。[主线]
 
         Args:
             rel_path: 相对项目根的路径。
@@ -130,17 +157,28 @@ class Project:
             bool。实验输出区与通用噪声目录一律排除 —— 输出区装的是运行时产物,
             偶尔出现的 .py 多半是保存下来的配置快照或临时脚本,
             按主代码的注释标准去审它们没有意义。
-            其余部分有索引时以索引为准(用户通过 codegraph.json 说了算),
-            没有索引时降级为全部纳入:源码分布在哪些文件夹是项目自己的事,
-            列举必然漏。
+            其余部分按配置判定(codegraph.json 的 include/exclude、.gitignore),
+            **不看索引**:索引只是辅助文件,落后于磁盘时不能把新文件挡在审计外。
+            源码分布在哪些文件夹是项目自己的事,列举必然漏,所以靠排除定义。
         """
         top = _top_segment(rel_path)
         if top is None or top in ALWAYS_EXCLUDED or top in self.output_roots:
             return False
-        indexed = self.indexed_files()
-        if indexed is not None:
-            return rel_path in indexed
-        return self._fallback_in_scope(rel_path)
+        return self._config_in_scope(rel_path)
+
+    def py_files_in_scope(self):
+        """磁盘上所有在审计范围内的 .py 文件。[主线]
+
+        Returns:
+            list[str],项目根相对路径(POSIX),已排序。rules_ast 遍历它,
+            cli 拿它和 indexed_files() 对比来发现索引落后。
+        """
+        out = []
+        for path in sorted(self.root.rglob("*.py")):
+            rel = path.relative_to(self.root).as_posix()
+            if self.in_scope(rel):
+                out.append(rel)
+        return out
 
     def _codegraph_patterns(self):
         """读 codegraph.json 的 include / exclude。[基础设施]
@@ -158,9 +196,12 @@ class Project:
                 cfg = self.root / "codegraph.json"
                 raw = json.loads(cfg.read_text(encoding="utf-8"))
             if isinstance(raw, dict):
-                include = tuple(x for x in (raw.get("include") or ()) if isinstance(x, str))
-                exclude = tuple(x for x in (raw.get("exclude") or ()) if isinstance(x, str))
-        except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+                # 自己的配置段已在 load() 校验过;走到磁盘 codegraph.json 这条路时
+                # 文件是用户手写的,类型可能是坏的 —— 坏了当没有模式,不让审计罢工。
+                inc, exc = raw.get("include"), raw.get("exclude")
+                include = tuple(x for x in inc if isinstance(x, str) and x) if isinstance(inc, list) else ()
+                exclude = tuple(x for x in exc if isinstance(x, str) and x) if isinstance(exc, list) else ()
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError, TypeError):
             pass
         object.__setattr__(self, "_cg_patterns", (include, exclude))
         return self._cg_patterns
@@ -172,18 +213,21 @@ class Project:
             set[str],项目根相对路径;不是 git 仓库时返回 None。
             一次调用拿到全集,不逐文件问 —— `git check-ignore` 每文件一次太慢。
         """
-        if self._git_files is not None:
-            return self._git_files or None
-        proc = subprocess.run(
-            ["git", "ls-files", "-co", "--exclude-standard"],
-            cwd=self.root, capture_output=True, text=True,
-        )
-        files = set(proc.stdout.splitlines()) if proc.returncode == 0 else set()
-        object.__setattr__(self, "_git_files", files)
-        return files or None
+        if self._git_files is None:
+            # -z:NUL 分隔、路径原样。不加的话 git 会把非 ASCII 路径转义成
+            # "\350\256\255.py" 这种带引号的形式,中文文件名就全对不上、整个漏审。
+            proc = subprocess.run(
+                ["git", "ls-files", "-coz", "--exclude-standard"],
+                cwd=self.root, capture_output=True, text=True,
+            )
+            # 失败缓存成 False,和「成功但一个文件都不可见」区分开 —— 后者是
+            # 全被 .gitignore 掉了,该返回空集,不能当成不受限。
+            files = set(filter(None, proc.stdout.split("\0"))) if proc.returncode == 0 else False
+            object.__setattr__(self, "_git_files", files)
+        return None if self._git_files is False else self._git_files
 
-    def _fallback_in_scope(self, rel_path):
-        """没有索引时的降级判断。[主线]
+    def _config_in_scope(self, rel_path):
+        """按配置判断路径是否在审计范围内。[主线]
 
         优先级 **codegraph.json > .gitignore**,与 codegraph 建索引时一致:
 
@@ -196,13 +240,13 @@ class Project:
             rel_path: 相对项目根的路径。
 
         Returns:
-            bool。这是近似判断 —— 只支持目录前缀与路径段匹配,
-            不实现完整的 gitignore 通配语义。建了索引之后走精确路径。
+            bool。模式按 gitignore 语义匹配(`*`、`**`、锚定、目录),
+            与上游建索引时一致;不支持 `!` 取反。
         """
         include, exclude = self._codegraph_patterns()
-        if _matches_prefix(rel_path, exclude):
+        if _matches(rel_path, exclude):
             return False
-        if _matches_prefix(rel_path, include):
+        if _matches(rel_path, include):
             return True
         visible = self._git_visible()
         if visible is None:
@@ -227,11 +271,13 @@ class Project:
             rel_path: 相对项目根的路径。
 
         Returns:
-            层名字符串;不属于任何已声明层时返回 None。
+            所在层的目录名;不属于任何已声明层时返回 None。
             None 表示"未声明",层级规则会跳过它,而不是判它违规。
+            一层有多个目录时返回的是文件实际所在的那个目录名,
+            层的序号由 _layer_index 给。
         """
         top = _top_segment(rel_path)
-        return top if top in self.layers else None
+        return top if any(top in g for g in self.layers) else None
 
     def _layer_index(self, rel_path):
         """取路径所属层的序号,0 为最内层。[基础设施]
@@ -243,7 +289,9 @@ class Project:
             int;未分层时返回 None。
         """
         layer = self.layer_of(rel_path)
-        return self.layers.index(layer) if layer is not None else None
+        if layer is None:
+            return None
+        return next(i for i, g in enumerate(self.layers) if layer in g)
 
     def may_depend(self, src_path, tgt_path):
         """判断源文件是否允许依赖目标文件。[主线]
@@ -274,19 +322,24 @@ class Project:
     def is_outermost(self, rel_path):
         """判断路径是否位于最外层。[主线]
 
-        最外层是 `[一次性]` 代码的唯一合法住处:依赖规则保证没有内层能依赖
-        外层,放在最外层就等于没有任何东西能依赖它 —— 正是一次性代码
-        该有的性质。因此无需再为它单开一个配置项。
+        最外层是 `[一次性]` 代码的唯一合法住处:依赖规则保证没有**内层**能依赖
+        外层。同层之间可以互调(temp_scripts/a.py 调 b.py 一直允许,一层多目录时
+        scripts_a 调 scripts_b 也允许),所以最外层的函数不是「没人依赖」,是
+        「只有同层依赖」—— 调用方和作者是同一拨人。这才是豁免 R4/R5/R6 的理由,
+        也是一次性代码该有的性质。因此无需再为它单开一个配置项。
 
         Args:
             rel_path: 相对项目根的路径。
 
         Returns:
-            bool。未声明 layers 时恒为 False。
+            bool。未声明 layers、或只声明了一层时恒为 False —— 唯一的一层是核心,
+            不是外围。豁免最外层的理由是「只有同层依赖它,读者就是作者,逐参数介绍是负担」,
+            对所有代码的根基不成立;单包项目照技能建议写 ["<包名>"] 时,
+            核心的 R1/R4/R5/R6 必须照跑。
         """
-        if not self.layers:
+        if len(self.layers) < 2:
             return False
-        return self.layer_of(rel_path) == self.layers[-1]
+        return self.layer_of(rel_path) in self.layers[-1]
 
 
 def find_root(start):
@@ -372,6 +425,50 @@ def _check_dir_name(value, where, errors):
         errors.append(f"{where} 是通用噪声目录,不能用作层或输出区:{value!r}")
 
 
+def _check_layers(raw, errors):
+    """校验 layers 字段,支持一层多目录。[基础设施]
+
+    每个元素是字符串(单目录层)或字符串列表(多目录层,同层平级)。
+    `[["ovam", "erase"], "scripts"]` 表示 ovam 与 erase 同为核心、平级,
+    可能互相调用但说不出谁上谁下;scripts 在它们外面。
+    同层可互通,只禁内层依赖外层 —— 分层架构的标准定义。
+
+    Args:
+        raw: 配置字典。
+        errors: 累积错误的列表。
+
+    Returns:
+        tuple[tuple[str, ...], ...],每层一个元组;出错时返回空元组。
+        扁平写法 ["a", "b"] 规范化为 (("a",), ("b",)),老配置照常能用。
+    """
+    if "layers" not in raw:
+        return ()
+    items = raw["layers"]
+    if not isinstance(items, list):
+        errors.append(f"layers 必须是列表,得到 {type(items).__name__}")
+        return ()
+    groups = []
+    for i, item in enumerate(items):
+        if isinstance(item, str):
+            _check_dir_name(item, f"layers[{i}]", errors)
+            groups.append((item,))
+        elif isinstance(item, list):
+            if not item:
+                errors.append(f"layers[{i}] 是空列表 —— 一层至少要有一个目录")
+                continue
+            for j, name in enumerate(item):
+                _check_dir_name(name, f"layers[{i}][{j}]", errors)
+            groups.append(tuple(x for x in item if isinstance(x, str)))
+        else:
+            errors.append(f"layers[{i}] 必须是字符串或字符串列表,"
+                          f"得到 {type(item).__name__}")
+    flat = [d for g in groups for d in g]
+    dupes = sorted({x for x in flat if flat.count(x) > 1})
+    if dupes:
+        errors.append(f"layers 有重复:{', '.join(dupes)} —— 一个目录只能属于一层")
+    return tuple(g for g in groups if g)
+
+
 def _check_dir_list(raw, key, errors):
     """校验一个顶层目录名列表字段(layers / vendored)。[基础设施]
 
@@ -422,7 +519,7 @@ def _check_output_roots(raw, errors):
         return DEFAULT_OUTPUT_ROOTS
     if not value:
         errors.append("output_roots 不能为空列表。不想声明就整个不写这个键，"
-                      "默认是 [\"runs\", \"experiments\"]")
+                      "默认是 [\"runs\"]")
         return DEFAULT_OUTPUT_ROOTS
     for i, name in enumerate(value):
         _check_dir_name(name, f"output_roots[{i}]", errors)
@@ -435,6 +532,10 @@ def _check_output_roots(raw, errors):
 
 # codegraph.json 认得的键。打错 excludes 会静默失效,所以从严。
 _CG_KEYS = frozenset({"extensions", "includeIgnored", "exclude", "include", "deprioritize"})
+# 四个字符串列表键。includeIgnored 按上游 1.6.0 的契约是 string[],只用来救回
+# .gitignore 里的**嵌套 git 仓库**(project-config.d.ts:14),与普通源码无关 ——
+# 我们只校验类型、原样透传,不赋予它任何审计语义。普通源码要进范围用 include。
+_CG_LIST_KEYS = ("exclude", "include", "deprioritize", "includeIgnored")
 
 
 def _check_codegraph(raw, errors):
@@ -458,6 +559,34 @@ def _check_codegraph(raw, errors):
     if unknown:
         errors.append(f"codegraph 有未知字段:{', '.join(sorted(unknown))}。"
                       f"codegraph.json 只认 {', '.join(sorted(_CG_KEYS))}")
+
+    # 值的类型必须校验。这一段原样写进 codegraph.json,再被 _codegraph_patterns
+    # 读回来迭代 —— 不校验的后果不是报错,是更糟的静默失效:
+    #   "exclude": 1        → 读回时 TypeError,traceback 而非 error JSON
+    #   "include": "src"    → 字符串被逐字符迭代成 ("s","r","c"),按三个单字母过滤
+    #   "exclude": [1, 2]   → isinstance 滤成空元组,用户以为排除生效了
+    for key in _CG_LIST_KEYS:
+        if key not in cg:
+            continue
+        v = cg[key]
+        if not isinstance(v, list):
+            errors.append(f"codegraph.{key} 必须是字符串列表,得到 {type(v).__name__}"
+                          + ("。只有一个也要写成列表:[\"src/\"]" if isinstance(v, str) else ""))
+            continue
+        for i, x in enumerate(v):
+            if not isinstance(x, str):
+                errors.append(f"codegraph.{key}[{i}] 必须是字符串,得到 {type(x).__name__}")
+            elif not x:
+                errors.append(f"codegraph.{key}[{i}] 不能为空")
+    if "extensions" in cg:
+        ext = cg["extensions"]
+        if not isinstance(ext, dict):
+            errors.append(f"codegraph.extensions 必须是对象(后缀 → 语言),得到 {type(ext).__name__}")
+        else:
+            for k, v in ext.items():
+                if not isinstance(v, str) or not v:
+                    errors.append(f"codegraph.extensions[{k!r}] 的值必须是非空字符串,"
+                                  f"得到 {type(v).__name__}")
     return cg
 
 
@@ -486,19 +615,20 @@ def _validate(raw, config_file):
         errors.append(f"未知字段:{', '.join(sorted(unknown))}。"
                       f"只认 {', '.join(sorted(_KNOWN_KEYS))}")
 
-    layers = _check_dir_list(raw, "layers", errors)
+    layers = _check_layers(raw, errors)
+    flat_layers = tuple(d for g in layers for d in g)
     vendored = _check_dir_list(raw, "vendored", errors)
     output_roots = _check_output_roots(raw, errors)
     codegraph = _check_codegraph(raw, errors)
 
     for root in output_roots:
-        if root in layers:
+        if root in flat_layers:
             errors.append(f"output_roots 里的 {root!r} 与 layers 中的层同名 —— "
-                          f"输出区不索引,层要索引,一个目录不能同时是两者")
+                          f"输出区不审计,层要审计,一个目录不能同时是两者")
         if root in vendored:
             errors.append(f"output_roots 里的 {root!r} 与 vendored 中的目录同名 —— "
-                          f"输出区不索引,第三方代码要索引")
-    overlap = sorted(set(layers) & set(vendored))
+                          f"输出区不审计,第三方代码要审计")
+    overlap = sorted(set(flat_layers) & set(vendored))
     if overlap:
         errors.append(f"vendored 与 layers 重叠:{', '.join(overlap)} —— "
                       f"一个目录要么是你的代码要么是第三方的")

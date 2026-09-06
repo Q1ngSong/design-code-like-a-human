@@ -22,6 +22,18 @@ import sqlite3
 from . import parser
 from .rules_ast import Finding
 
+
+def _dirs(group):
+    """把一层的目录元组渲染成 `a/ 或 b/`。[基础设施]
+
+    Args:
+        group: 一层的目录名元组。
+
+    Returns:
+        str,单目录层就是 `a/`。
+    """
+    return " 或 ".join(f"{d}/" for d in group)
+
 # LIKE 中的 `_` 是单字符通配符,过滤 dunder 必须转义。
 # 写成 NOT LIKE '__%' 会滤掉每一个函数,让 R1 静默返回空。
 # 角色标记的判定统一交给 parser.role_of，SQL 只负责把 docstring 取回来。
@@ -165,7 +177,10 @@ def check_project(proj):
                 if not proj.is_outermost(file_path):
                     out.append(Finding(
                         "R2", file_path, line, name,
-                        f"标记为 [一次性] 却不在最外层 {proj.layers[-1]}/",
+                        (f"标记为 [一次性] 却在唯一的一层 {_dirs(proj.layers[0])} 里 —— "
+                         f"单层就是核心,一次性代码该移出去,或再声明一个外层来放它")
+                        if len(proj.layers) < 2 else
+                        f"标记为 [一次性] 却不在最外层 {_dirs(proj.layers[-1])}",
                     ))
 
         # 两端都要在范围内:目标不归我们管的话,报出来用户也无从处置。

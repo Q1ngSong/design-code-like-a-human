@@ -31,6 +31,17 @@ writing-python-comments。功能跑通后用 auditing-code-comments 审计。
 不要单独运行 codegraph sync —— 它会清空 docstring 回填结果。
 索引不用手工建，第一次跑上面这条命令时会自动建好。
 MSG
+    s="$root/.codegraph/unattended"
+    if [ -f "$s" ]; then
+      if [ -n "$(find "$s" -mmin -1440 2>/dev/null)" ]; then
+        echo
+        echo "无人值守中：$(date -r "$s" '+%m-%d %H:%M') 起，分支 $(head -c 60 "$s" | tr -d '\n')。"
+        echo "不问、不拦；不动配置、不删文件、审计发现不自动修（实验代码照改）；每一步以工具调用收尾，不要交出 turn。停止时：rm $s"
+      else
+        echo
+        echo "注意：$s 已超过 24 小时，视为过期忽略。要续就 touch 它，不要就 rm。"
+      fi
+    fi
     exit 0
   fi
   root="$(dirname "$root")"

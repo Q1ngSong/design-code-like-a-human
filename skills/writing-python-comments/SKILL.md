@@ -23,7 +23,7 @@ description: Use together with writing-minimal-code whenever writing or editing 
     """
 
 书写量随函数接口自动伸缩:无参数无返回值的一行即合格,有参数就每个参数一条,
-有返回值就一条 Returns。私有函数也不豁免。
+有返回值就写 Returns；生成器用 Yields 说明每次产出的值。私有函数也不豁免。
 
 **例外是最外层。** 声明了两层以上时,`layers` 末项(可以是多个目录)里的函数
 只要摘要行和角色标记,不要求 `Args`/`Returns`——没有内层依赖那一层,调用方只在
@@ -36,7 +36,7 @@ description: Use together with writing-minimal-code whenever writing or editing 
 
 最后那行 `变更:` 只在**改动已存在的函数、且改动影响到调用方能依赖的东西**时才加,
 新写的函数不加。什么算「影响调用方」、多次修改怎么办、审计规则 C1 能查到什么,
-见 `writing-minimal-code` 的「改了既有函数,记一行」一节。
+见 `writing-minimal-code` 的「改了既有函数，记一行」一节；快速迭代期间的变更记录在合并前统一补齐。
 
 ## 摘要行
 
@@ -44,10 +44,9 @@ description: Use together with writing-minimal-code whenever writing or editing 
 不写「稳定扩散超大模型管线」。codegraph 的 `explore` 对中文查询零命中,
 英文术语是它唯一能抓住的锚点;中文说明留给 `query` 和人。
 
-**关键词置于开头，或用标点切开。** 全文检索把连续的汉字当成一个整体，
-只能从头开始匹配。
-「把逐层权重聚合并归一化到 [0,1]」里的「归一化」搜不到,因为它埋在一串
-没有标点的汉字中段;改成「归一化:把逐层权重聚合到 [0,1]」就能搜到。
+**关键词放在开头，或用标点与前文分开。** codegraph 的全文检索将连续汉字视为一个整体，
+只能从这段文字的开头匹配。例如，搜索「归一化」无法匹配「把逐层权重聚合并归一化到 [0,1]」；
+改成「归一化:把逐层权重聚合到 [0,1]」后即可匹配。
 
 ## 角色标记
 
@@ -79,8 +78,9 @@ description: Use together with writing-minimal-code whenever writing or editing 
 
 ## 写完之后
 
-不要手工核对合规性,跑一次审计让脚本报。R0/R4/R5/R6 会指出缺角色标记、
-参数未介绍、缺 Returns、Args 里的参数名与 `def` 那一行对不上。
+先核对注释是否准确描述当前行为，再运行审计检查格式和遗漏。R0/R4/R5/R6 会指出
+缺角色标记、参数未介绍、缺 Returns/Yields、Args 中的参数名与函数签名不一致等问题；
+规则通过不代表注释内容正确。
 
 怎么跑、结果怎么读,见 `auditing-code-comments`。会话开始时 hook 也把
 带绝对路径的完整命令打出来过,直接用那条最省事。

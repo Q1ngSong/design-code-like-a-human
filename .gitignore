@@ -56,3 +56,4 @@ docs/
 # 我们自己写的分析已迁到 docs/(codegraph-notes.md、codegraph-evidence/),
 # 因为 spec 直接依赖它们作为证据。
 references_proj/
+output/

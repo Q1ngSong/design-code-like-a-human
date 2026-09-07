@@ -19,8 +19,8 @@
     "category": "Developer Tools",
     "capabilities": ["Interactive", "Read", "Write"],
     "defaultPrompt": [
-      "使用 $using-design-code-in-codex 审计这个项目的注释和边角料",
-      "使用 $using-design-code-in-codex 帮我规划一组调参实验"
+      "$dclh 审计这个项目的注释和边角料",
+      "$dclh 帮我规划一组调参实验"
     ]
   }
 }

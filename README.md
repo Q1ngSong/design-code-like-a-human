@@ -158,17 +158,36 @@ C1  改了已有函数却没留变更记录 —— 补一行「变更:」  (1)
 **装完插件、在项目根放一个 `.comment-standard.json` 之后,就不用再记什么了。**
 技能会按你在做的事自动触发:
 
-Codex 使用 [using-design-code-in-codex](skills/using-design-code-in-codex/SKILL.md)
-作为入口，再按任务调用下表的六个通用技能；Claude Code 直接使用通用技能。
-宿主按 skill 的 description 选择，入口是普通技能，不是安装时运行的平台判断脚本。
-Codex 插件面板的默认提示已指向入口；显式使用可以这样说：
+插件简称 **DCLH**。在 Codex、Claude Code 等支持 Agent Skills 的宿主中，
+安装并启用插件后，统一用自然语言指定简称和任务：
 
-    使用 $using-design-code-in-codex 审计这个项目的注释。
+    dclh 审计这个项目的注释
 
-    使用 $using-design-code-in-codex 创建 goal，按已确认的消融计划无人值守执行，
-    完成全部计划运行、汇总指标并验证选定配置后停止。
+    用 dclh 帮我规划一组调参实验
 
-入口集中维护十项指令及配套操作：`/goal`、`/plan`、`/review`、`/diff`、`/ps`、
+    dclh 按现有计划继续实验
+
+短入口定义在 [skills/dclh/SKILL.md](skills/dclh/SKILL.md) 的 YAML `name: dclh`，
+`description` 声明简称触发场景。它覆盖整个插件，宿主按描述选择入口，再按任务读取技能。
+自然语言匹配由宿主模型决定；需要显式选择时，各宿主的语法不同：
+
+| 宿主 | 显式调用示例 |
+|---|---|
+| Codex | `$dclh 审计这个项目`（也可从技能选择器选择 `dclh`） |
+| Claude Code 插件安装 | `/design-code-like-a-human:dclh 审计这个项目` |
+| 其他 Agent Skills 宿主 | 从该宿主的技能选择器选择 `dclh`，以其实际语法为准 |
+
+Claude Code 的插件技能使用 `插件名:技能名` 命名空间，因此这里不把 `/dclh`
+声明为跨宿主命令。参见 [Codex Skills](https://learn.chatgpt.com/docs/build-skills)
+和 [Claude Code Skills](https://code.claude.com/docs/en/skills)。
+
+在 Codex 中，短入口转到 [using-design-code-in-codex](skills/using-design-code-in-codex/SKILL.md)，
+原有长入口仍可使用；其他宿主直接选择下表的通用技能，不依赖 Codex 专有指令。
+`plugin.json` 的插件名称用于安装标识，`interface.defaultPrompt` 只提供面板示例；
+短入口由 `skills/dclh/SKILL.md` 定义。已安装旧版时，需要更新安装的插件并在新任务中
+确认能找到 `dclh`；仅修改源码不会更新另一份已安装的缓存。
+
+Codex 入口集中维护十项指令及配套操作：`/goal`、`/plan`、`/review`、`/diff`、`/ps`、
 `/status`、`/compact`、`/resume`、`/fork`、`/permissions`。可用性以当前宿主为准。
 已有适用的 goal 授权时直接使用；仅开启无人值守不会自动创建 goal。
 通用技能继续维护实验流程，入口不启动第二套循环。

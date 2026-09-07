@@ -31,7 +31,7 @@
 
 ## 这个项目做什么
 
-一个给科研原型代码加工程纪律的 Claude Code 插件。
+一个给科研原型代码加工程纪律的 Claude Code / Codex 插件。
 它按问题发生的时间,把处理方式分成两类。
 
 **已经写下的代码,用审计规则查。** 一条命令生成审计报告,定位到文件和行号:
@@ -158,13 +158,28 @@ C1  改了已有函数却没留变更记录 —— 补一行「变更:」  (1)
 **装完插件、在项目根放一个 `.comment-standard.json` 之后,就不用再记什么了。**
 技能会按你在做的事自动触发:
 
+Codex 使用 [using-design-code-in-codex](skills/using-design-code-in-codex/SKILL.md)
+作为入口，再按任务调用下表的六个通用技能；Claude Code 直接使用通用技能。
+宿主按 skill 的 description 选择，入口是普通技能，不是安装时运行的平台判断脚本。
+Codex 插件面板的默认提示已指向入口；显式使用可以这样说：
+
+    使用 $using-design-code-in-codex 审计这个项目的注释。
+
+    使用 $using-design-code-in-codex 创建 goal，按已确认的消融计划无人值守执行，
+    完成全部计划运行、汇总指标并验证选定配置后停止。
+
+入口集中维护十项指令及配套操作：`/goal`、`/plan`、`/review`、`/diff`、`/ps`、
+`/status`、`/compact`、`/resume`、`/fork`、`/permissions`。可用性以当前宿主为准。
+已有适用的 goal 授权时直接使用；仅开启无人值守不会自动创建 goal。
+通用技能继续维护实验流程，入口不启动第二套循环。
+
 | 你在做什么 | 触发的技能 | 它做什么 |
 |---|---|---|
 | 让 Claude 写或改代码 | `writing-minimal-code` | 先查代码库里有没有现成的,再决定写不写 |
 | 写 Python 函数 | `writing-python-comments` | 按标准写 docstring:摘要 + 角色标记 + Args/Returns |
 | 写会存文件的脚本 | `saving-experiment-outputs` | 动手前先说好输出存哪儿 |
-| 开始一组调参实验 | `running-experiments-on-branches` | 开分支跑,别在主分支上堆 commit |
-| 一次实验跑完 | `recording-experiment-results` | 往 CSV 里记一行再跑下一次 |
+| 开始、恢复或结束一组实验 | `running-experiments-on-branches` | 从固定基线开分支，收尾用 `--no-ff` 合回实际目标 |
+| 计划、运行或汇总实验 | `recording-experiment-results` | 跑前写计划，跑后补结果与版本关联 |
 | 功能跑通了想清理 | `auditing-code-comments` | 跑一遍审计,出一份报告 |
 
 ### 想主动触发就直接说
@@ -203,6 +218,26 @@ C1  改了已有函数却没留变更记录 —— 补一行「变更:」  (1)
 **不要单独运行 `codegraph sync`。** 它会把变动文件在索引里的记录整个删掉重建,
 清空回填结果,注释会从索引里静默消失 —— 必须走上面这条命令。
 
+## 实验的 Git 流程
+
+一组实验一个分支，开组时记录固定的基线提交、合并目标和输出位置。
+实验结束后补齐 CSV、选定最终实现与配置、完成审计和验证，再以 **`git merge --no-ff`**
+合回项目约定的目标。这样目标分支新增一个有两个父提交的合并节点，具体尝试也保留在其历史中。
+默认不使用 squash，也不通过 rebase 或 cherry-pick 代替合并。
+
+- 项目直接以 `master` 为主分支：`实验分支 → master`；以 `main` 为主分支则合入 `main`。
+- 项目明确使用集成分支：`实验分支 → develop → main/master`，每一级分别审阅、验证和合并。
+  不为套模板额外创建 `develop`，也不随本组发布未授权的其他修改。
+- 用 `git log --first-parent --oneline` 浏览目标分支的合并节点，用
+  `git log --graph --oneline --all` 看详细历史。经过 `develop` 时，主分支节点可能汇集多组实验。
+- 失败实验也保留记录；不保留的实现恢复到开组基线再合并。比较性扫描可以保留基线，不强行挑赢家。
+- 实验分支默认保留。合并、推送和输出备份分别验证；本地 stash 不随分支推送。
+
+用户要求完成整组实验且项目已明确合并约定时，收尾包含本地合并。已有推送授权则继续同步，
+未授权则交付本地可审阅结果。只要求暂停或保留分支时，不把它解释为完成合并。
+完整命令、冲突处理、两父提交验证和恢复顺序以
+[running-experiments-on-branches](skills/running-experiments-on-branches/SKILL.md) 为准。
+
 ## 接进你自己的实验循环
 
 `program.md`（autoresearch）、ARIS 的工作流、项目自己的 `AGENTS.md`——这些是
@@ -219,9 +254,9 @@ C1  改了已有函数却没留变更记录 —— 补一行「变更:」  (1)
         python3 <插件目录>/scripts/refresh.py . --json --base HEAD
     只看 findings 里 changed=true 的条目——落在这次改动上的。
       D3（写盘路径写死了）  改掉再跑，否则输出会散落
-      R1（零调用者）        这次留下的死代码，删掉——删代码不掉点是简化，加分
+      R1（零调用者）        先核对入口、动态引用和调用关系，确认是本次死代码且在授权范围内才处理
       R0（缺 docstring）    本项目不要求，忽略
-      C1（改了函数没加变更行）调参改的就是函数默认值，每轮都会报，忽略；合并前 --base main 再认真看
+      C1（改了函数没加变更行）调参改的就是函数默认值，每轮都会报，忽略；合并前以 --base <实际接收分支> 再认真看
       其余                   写进这一轮记录的备注，不阻塞
     带 --base 时退出码只看本轮，存量不算——但 C1 在调参时每轮都算 changed，所以退出码
     多半是 1，别拿它当「干净」的信号；看 changed=true 里除 C1 之外还有没有别的，没有就继续。
@@ -231,12 +266,10 @@ C1  改了已有函数却没留变更记录 —— 补一行「变更:」  (1)
 处理哪几条、忽略哪几条是驱动层的决定，按项目改。`audit.json` 的字段见
 `skills/auditing-code-comments/references/handling.md`。
 
-**有没有外部驱动，接法不同。** 有 `program.md` 或 ARIS 那样的循环——我们是工具，
-把上面那段贴进去就行，另外在启动前落一个哨兵，让技能知道现在没人：
-
-    mkdir -p .codegraph
-    [ -f .codegraph/.gitignore ] || echo '*' > .codegraph/.gitignore
-    git branch --show-current > .codegraph/unattended
+**有没有外部驱动，接法不同。** 有 `program.md` 或 ARIS 那样的循环时，
+把上面那段放进驱动指令。用户已授权无人值守后，按
+[实验分支技能](skills/running-experiments-on-branches/SKILL.md) 先检查输出目录均被忽略，
+再创建 `.codegraph/unattended` 标记；跳过忽略检查可能让输出进入提交或被 stash 收走。
 
 没有外部驱动、只装了插件——`running-experiments-on-branches` 就是驱动，
 你说「开始迭代」它自己落哨兵、自己跑循环、自己从压缩后恢复。
@@ -246,19 +279,20 @@ C1  改了已有函数却没留变更记录 —— 补一行「变更:」  (1)
 
 **超时、重试、什么时候停，驱动层说了算。** `program.md` 里写了就按它的；
 没写，`running-experiments-on-branches` 有一套照 autoresearch 抄的默认
-（基线两倍超时、修两次放弃、开跑前查 CSV 去重）。本插件管的是 git 和记录
-怎么收拾，不管循环怎么控制。
+（基线两倍超时、修两次放弃、开跑前查 CSV 去重）。默认是开放搜索：agent 自己规划、按趋势换方向，
+跑到用户叫停或约定预算用完；用户明确给了固定清单的，清单跑完就停，不自行加项。
+到点就清除标记并完成记录与 Git 收尾。
 
-**一个前提**：Claude Code 和 Codex 都没有「循环模式」。无人值守能跑一夜，
-靠的是 agent 每一步都调工具、始终不交出 turn；哪一刻输出了一段没有后续动作的
-总结，就停在那儿等人。技能里写了这条，驱动指令里也该写。
+**持续执行由宿主或外部驱动承担。** Codex 提供 goal 时，已授权的目标可跨轮次推进，
+入口负责目标状态，通用技能负责实验步骤。没有原生 goal 或外部续跑驱动时，
+当前轮次结束后不能保证自动继续；无人值守标记记录工作模式，本身不是调度器。
 
-无人值守时怎么退让，五个技能里各自写了（`writing-python-comments` 没有要退让的：
-注释怎么写不因没人在场而变）。总规则四条：
-**不问、不改、不拦、自己定的留一行为什么**。「不改」指不动配置、不删文件、
-审计发现不自动修——实验代码本身照改，那正是快速迭代在做的事。判据只有一个——
-`.codegraph/unattended` 存在且不超过 24 小时；`audit.json` 的 `unattended` 字段
-和会话开头 hook 那一行都是它。
+无人值守的具体处理见各通用技能（Python 注释标准不因模式而变）。共同边界如下：
+**审计中的待定事项先记录，已授权的实验继续执行。** 不因存量 finding 自动修改项目声明、
+删除文件或扩大实验范围；本轮代码按驱动约定处理，记录选择及理由。
+缺少必需信息、授权或出现无法安全恢复的 Git 状态时，保留现场并汇报具体阻碍，不能把沉默当成同意。
+`.codegraph/unattended` 存在且距修改不足 24 小时表示标记有效；`audit.json` 和 hook 提示
+只是读取时的快照。标记不代替用户授权、运行状态或完成检查。
 
 ## 审计规则
 
@@ -289,8 +323,8 @@ D1 说「核心层依赖了脚本层」，C1 要分清改的是别人依赖的�
 | `writing-python-comments` | 写或改 Python 函数时 | 3、5 |
 | `auditing-code-comments` | 功能跑通后、提交前 | 1、2、3 |
 | `saving-experiment-outputs` | 写任何会写盘的脚本前 | 7 |
-| `recording-experiment-results` | 一次实验跑完,下一次开始前 | 6 |
-| `running-experiments-on-branches` | 开始一组实验或调参时 | 6、8 |
+| `recording-experiment-results` | 实验计划、恢复、结果与总结 | 6 |
+| `running-experiments-on-branches` | 实验开组、恢复、收尾与合并 | 6、8 |
 
 `writing-minimal-code` 是一条四道决策流：该不该存在 → 能不能改现有的 →
 新写的话代码从哪来 → 写成什么样。
@@ -358,19 +392,17 @@ lr 推到 0.16 还在推；会在噪声里追假信号；会把整夜预算烧�
 跑一夜之前，把想试的方向和每个方向的预算写进你自己的驱动指令
 （`program.md` 之类）。插件管"放弃了要留下记录"，不管"该不该放弃"。
 
-快速迭代中，失败尝试的代码改动保存在 stash 中。此前测试中，默认 `git gc` 后仍能找到
+快速迭代中，失败尝试的代码改动保存在本地 stash 中，分支合并和推送不会备份它们。
+需要跨机器复现时使用代码提交或已约定的备份方式；不要把 stash 当作永久归档保证。
+此前测试中，默认 `git gc` 后仍能找到
 120 天前的 stash；显式执行 `reflog expire` 可使旧条目过期。stash 和 commit 一样保存
 压缩快照：对一个 28 KB 的 `train.py` 保存 100 次，gc 后 `.git` 增加了 124 KB。
 这是该次测试的结果，实际占用取决于保存的文件和改动量。
 
 ## TODO
 
-- **实验分支多到碍事时，转 tag 存档。** 一年三篇论文大约会积 50–100 个
-  `exp/` 分支，`git branch` 会难用。做法是合并后把分支转成 tag
-  （`git tag <名> <名>` 再 `git branch -D <名>`），历史一条不少，
-  `git branch` 只留在做的事，翻旧账走 `git tag --list 'exp/*'`。
-  暂不写进技能——目前这只是推测的痛，还没在真实项目上碰到过。
-  等确实碍事了再加。
+- **分支过多时再评估归档方式。** 当前默认保留实验分支。用户以后明确要求归档时，
+  再核对合并关系、记录和输出是否可追溯，以及所需远端备份；不自动改成强制删分支的流程。
 
 
 ## 已知限制

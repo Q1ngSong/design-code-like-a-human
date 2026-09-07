@@ -131,8 +131,8 @@ def _mark_changed(findings, changes, files, proj):
        被当成存量、退出码给 0。
 
     抓不到的是图效应:删了一处调用点,让别的文件里没动过的函数新报 R1 ——
-    那个 finding 既不在改动函数里也不在改动文件里。合并前 --base main
-    全看一遍是为这个。D2 是文件级的,不会被标。
+    那个 finding 既不在改动函数里也不在改动文件里。合并前以 --base 指定实际接收分支，
+    同时查看存量 R1 是为这个。D2 是文件级的,不会被标。
 
     Args:
         findings: 全量 finding 列表。
@@ -430,6 +430,8 @@ def render_text(result):
 def main(argv=None):
     """命令入口。[主线]
 
+    变更: 2026-09-07 --base 帮助改为实际接收分支，保留原有参数和审计行为。
+
     Args:
         argv: 参数列表,None 时取 sys.argv[1:]。
             位置参数是项目路径(默认当前目录);
@@ -446,7 +448,7 @@ def main(argv=None):
     ap.add_argument("--json", action="store_true", help="输出 JSON 给 agent 解析")
     ap.add_argument("--base", metavar="REF",
                     help="差异审阅:标出相对这个 git ref 改过的函数上的告警。"
-                         "快速迭代跑前用 HEAD(圈出工作区里这次的改动),合并前用 main。"
+                         "快速迭代跑前用 HEAD(圈出工作区里这次的改动),合并前用实际接收分支（main、master或者上一级分支等）。"
                          "省略则全仓库审阅")
     args = ap.parse_args(argv)
 

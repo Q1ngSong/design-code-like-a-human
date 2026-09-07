@@ -252,7 +252,7 @@ def changed_functions(proj, base="HEAD"):
     Args:
         proj: Project 实例。
         base: git ref。`HEAD` 是工作区里未提交的改动(快速迭代跑前审计看这个,
-            那时这次尝试还没 commit);`main` 是整条分支相对主分支的。
+            那时这次尝试还没 commit);合并前传实际接收分支（可能是 main、master 或者上一级分支等），比较完整的待合并差异。
 
     Returns:
         dict,{相对路径: {限定名: _Change}}。文件集合来自 changed_files

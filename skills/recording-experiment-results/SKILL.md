@@ -1,6 +1,6 @@
 ---
 name: recording-experiment-results
-description: Use when an experiment run finishes, before starting the next one - append a row to this round's CSV recording what was tried, the metric, and the conclusion, so twenty rounds later the results can still be compared instead of living only in scrollback. 触发场景:实验跑完了、记录结果、实验记录、汇总一下结果、这组实验的结论、上次那个实验结果呢。
+description: Use when planning, resuming, finishing, or summarizing experiments - record each task's plan before running, then its metrics, conclusion, output path, and reproducible version references before moving on. 触发场景:实验计划、实验恢复、实验跑完了、记录结果、汇总结果、这组实验的结论、上次那个实验结果呢。
 ---
 
 # 记录实验结果
@@ -23,7 +23,7 @@ rank32_lr1e-4,再翻倍确认拐点,FID 14.1 / CLIP 0.271,"discard：过拟合�
 
 按标准 CSV 格式读写；字段含英文逗号、换行或双引号时，正确引用和转义。
 
-`experiments/` **入库**。记录不是产物，是结论——它要随仓库走、要在 squash 时
+`experiments/` **入库**。记录不是产物，是结论——它要随仓库走、要在 `--no-ff` 合并时
 进主分支、要在 worktree 删掉之后还在。`runs/` 才是产物，那个不入库。
 
 | 列 | 写什么 |
@@ -45,6 +45,11 @@ rank32_lr1e-4,再翻倍确认拐点,FID 14.1 / CLIP 0.271,"discard：过拟合�
 同名 task 可能出现在不同组，需核对提交中的 CSV 路径和记录。stash 按完整组路径与 task 名
 定位，取回方式见 `running-experiments-on-branches`。名称用于检索，不代替版本核对；
 重跑还需要对应代码、完整配置和运行参数。固定参数不要只依赖目录名推断。
+开组时记录基线提交和合并目标（不明确就写「待定」）；完整命令、种子、数据划分、依赖环境写一次进
+本组入库的说明文件，每行 `简介` 只记与之不同的项，保持已有 CSV 列结构。
+运行版本就是 keep 的 commit 或 discard 的 stash，前提是跑完到提交、stash 之间不再改实验代码。
+只有三种情况另存源码和配置快照到本次输出目录并在记录中引用：一次决策跑了多个 task、
+跑后确实改了代码、恢复时发现有差异却找不到对应的 commit 或 stash。stash 仅是本地存档，不随分支推送。
 
 **开始新尝试前，工作区要干净**：上次的代码和记录已按对应模式提交或存档。
 
@@ -62,14 +67,17 @@ CSV 记录一起提交；快速迭代 discard 时，单独提交 CSV 记录，�
 先核对本组 CSV、已有进程和工作区差异。结论为空或提交、存档尚未完成时，按
 `running-experiments-on-branches` 的恢复流程处理；不要直接把实验中的代码提交成 `chore:`。
 尝试已完成后，仍需查清剩余改动的来源，才能按无关改动处理。
-**不要 amend 进上一个 commit**——那个 commit 的 message 是上一次实验的记录，
-塞进无关改动就说不清那次跑的是什么了。单独提交，message 写清里面是什么、
-说明它不是实验，例如 `chore: 任务开始前整理 README`。
-用户在场时先确认是否提交，避免提交用户尚未完成的工作。无人值守时，确认与实验无关后
-单独提交为 `chore:`，并在 message 中列清内容。模式判定见 `auditing-code-comments`。
+**不要 amend 进上一个 commit**——那个 commit 的 message 是上一次实验的记录，塞进无关改动就
+说不清那次跑的是什么了。无关改动单独提交，message 写清里面是什么、说明它不是实验：
+`chore: 任务开始前清理 —— README 改动、上次崩溃的半成品`。有人在场时先问一句要不要提交，
+那可能是他改到一半的东西；无人值守时不问，直接提交成 `chore:`，message 里列清路径，人回来看 log
+就知道开跑前工作区里有过什么。进了 git 就不会被后面的 `stash push -u` 收走，也随时能撤回；
+不还原、不 stash 用户的改动。
 
-**运行结束到提交之间不要再修改实验代码**，以免提交内容与实际运行的代码不一致。
-如果确实修改了，在 `结论` 末尾注明「跑后又改了代码，此行不可复现」。
+**保存实际运行版本，再做后续修改。** 若跑后修改影响数值路径，分配新 task 重新验证；
+纯文档或运行清理等维护变更可另行提交并做对应检查，注明它们晚于该次运行。
+原记录继续关联原源码快照，不能将旧指标挂到未经运行的新实现上。
+若原源码已无法恢复，明确标记该行不可复现，不编造对应版本。
 
 **每组实验使用一个 CSV 文件。** 需要总表时，汇总 `experiments/**/*.csv`。
 
@@ -106,6 +114,8 @@ commit 可找 —— 三个月后 CSV 里有这一行,git 里却对不上它跑�
 暂时不知道的结果字段留空，不要只写半行 CSV 文本。
 
 **结果出来后先记录，再决定下一步。** 及时保存当时的判断，避免事后补记时混入后续结果。
+暂停或取消的未启动计划保留空结果，在 `简介` 注明原因；恢复时先核对是否仍需执行，
+不把从未启动的任务记成 crash，也不把空结果自动视为需要重跑。
 
 这组收尾时（合并前）在 CSV 末尾追加一行总结，随最后一次的 commit 一起提交；
 最后一次已经提交了就再提交一次，不 amend（见 `running-experiments-on-branches`
@@ -114,6 +124,9 @@ commit 可找 —— 三个月后 CSV 里有这一行,git 里却对不上它跑�
 `结论` 写为什么胜出、下一轮打算做什么，`输出目录` 指向胜出那次的目录。
 全部失败时，简介写「无胜出尝试，回到基线」，结论说明放弃原因和下一步；指标与输出目录
 可引用已有的基线记录，缺少时填 `—`，不要编造胜出结果。快速迭代中的总结单独提交。
+比较性扫描没有唯一赢家时，简介写比较范围和最终保留的设置，指标列汇总关键结果，
+结论说明取舍及不确定性，输出目录指向本组实际汇总目录；不因某项均值略高就宣称全面最优。
+本地合并、远端推送及最终合并提交 ID 在交接时分别汇报，流程见 `running-experiments-on-branches`。
 
 ## 关于格式
 

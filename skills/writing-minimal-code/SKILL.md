@@ -1,6 +1,6 @@
 ---
 name: writing-minimal-code
-description: Use before writing or changing any code in research or experiment code - decide whether it needs to exist, whether a small edit to existing code does it, where new code should come from, and how small it can be; also lists defensive code that must not be simplified away. Pair with writing-python-comments for the docstring format. 触发场景:写代码、改代码、修改代码、增加功能、新增某个功能、加个函数、实现某个特性、重构、简化代码、精简代码、优化代码、这段代码太复杂、代码结构乱。
+description: Use before writing or changing any code in research or experiment code - decide whether it needs to exist, whether a small edit to existing code does it, where new code should come from, and how small it can be (directory design, only when the project lacks structure, goes to designing-project-layout); also lists defensive code that must not be simplified away. Pair with writing-python-comments for the docstring format. 触发场景:写代码、改代码、修改代码、增加功能、新增某个功能、加个函数、实现某个特性、重构、简化代码、精简代码、优化代码、这段代码太复杂、代码结构乱。
 ---
 
 # 动手之前
@@ -121,6 +121,13 @@ codegraph 的全文检索将连续汉字视为一个整体，只能从这段文�
 
 反过来，如果压缩之后需要读两遍才懂，或者把错误处理藏进了链式调用，
 就保持展开。行数少不是目标，能看懂才是。
+
+## 目录结构缺失时
+
+多数时候项目已经有结构，改动落在现有文件里，规划时说一句「改 `ovam/attention.py`，探针放
+`temp_scripts/`，输出存 `runs/...`」就够；输出路径画不画树都按 `saving-experiment-outputs` 说定。
+新项目、要加的东西没有落脚处、或平铺到分不清核心和脚本时，先调 `designing-project-layout`
+拟一份目录结构，拿到树再走四道。`[一次性]` 的探针不进核心层，放最外层或层外。
 
 **写出来的每个函数都要有 docstring，特殊方法（`__init__` 这类）除外。**
 格式、角色标记、`Args` 里该写什么、哪一层可以少写，见 `writing-python-comments`——

@@ -1,6 +1,6 @@
 ---
 name: saving-experiment-outputs
-description: Use before writing or editing any script that saves files (checkpoints, metrics, figures, logs) - settle where the output goes before writing code, by proposing a concrete directory and getting it confirmed, so experiment results stay tidy instead of accumulating as output/ results2/ test_final/. 触发场景:代码目录设计、目录结构怎么定、结果存哪里、输出放哪、保存 checkpoint、存模型、存日志、写会产生文件的脚本、中间文件太乱、文件散落。
+description: Use before writing or editing any script that saves files (checkpoints, metrics, figures, logs) - settle where the output goes before writing code, by proposing a concrete directory and getting it confirmed, so experiment results stay tidy instead of accumulating as output/ results2/ test_final/. 触发场景:结果存哪里、输出放哪、保存 checkpoint、存模型、存日志、写会产生文件的脚本、中间文件太乱、文件散落。
 ---
 
 # 保存路径：先说好存哪儿

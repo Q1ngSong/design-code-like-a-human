@@ -38,7 +38,7 @@
 零调用者、反向依赖、缺失的变更记录、写死的写盘路径、标成 `[一次性]` 却放错层的代码。
 这些先由工具定位,不必靠人从头通读。是否处置,仍要结合上下文判断。
 
-**正在写的那一刻,用六个技能管。** 技能按 Claude 正在做的事自动触发:
+**正在写的那一刻,用七个技能管。** 技能按 Claude 正在做的事自动触发:
 写代码前先找现成实现、写盘前先确定目录、跑实验前先开分支。
 这些是习惯,规则替不了,但可以在动手那一刻提醒。
 
@@ -130,7 +130,7 @@ C1  改了已有函数却没留变更记录 —— 补一行「变更:」  (1)
 **层不必覆盖所有目录**,没进任何层的路径跳过校验。**顺序写反比不写更糟** ——
 会把正常依赖全报成违规,满屏 D1。拿不准就先只写最内层那一个。
 
-不想自己判断的话,直接让 Claude 看一眼目录结构给建议 —— 审计技能里有同样的判据。
+不想自己判断的话,直接让 Claude 看一眼目录结构给建议 —— `designing-project-layout` 技能管这个,新项目拟目录也是它。
 
 `codegraph` 段原样写进生成的 `codegraph.json`,用来控制索引范围。
 通常不用写 —— codegraph 默认索引除 `.gitignore` 忽略之外的一切,够用。
@@ -195,6 +195,7 @@ Codex 入口集中维护十项指令及配套操作：`/goal`、`/plan`、`/revi
 | 你在做什么 | 触发的技能 | 它做什么 |
 |---|---|---|
 | 让 Claude 写或改代码 | `writing-minimal-code` | 先查代码库里有没有现成的,再决定写不写 |
+| 新项目、结构缺失或首次填 `layers` | `designing-project-layout` | 拟一份能直接写成 `layers` 的目录结构 |
 | 写 Python 函数 | `writing-python-comments` | 按标准写 docstring:摘要 + 角色标记 + Args/Returns |
 | 写会存文件的脚本 | `saving-experiment-outputs` | 动手前先说好输出存哪儿 |
 | 开始、恢复或结束一组实验 | `running-experiments-on-branches` | 从固定基线开分支，人看过结果、说合并后用 `--no-ff` 合回实际目标 |
@@ -344,6 +345,7 @@ D1 说「核心层依赖了脚本层」，C1 要分清改的是别人依赖的�
 | `writing-python-comments` | 写或改 Python 函数时 | 3、5 |
 | `auditing-code-comments` | 功能跑通后、提交前 | 1、2、3 |
 | `saving-experiment-outputs` | 写任何会写盘的脚本前 | 7 |
+| `designing-project-layout` | 新项目、结构缺失、首次填 `layers` | 1 |
 | `recording-experiment-results` | 实验计划、恢复、结果与总结 | 6 |
 | `running-experiments-on-branches` | 实验开组、恢复、收尾与合并 | 6、8 |
 

@@ -5,7 +5,7 @@ description: "Codex entry point for design-code-like-a-human. Use in Codex for r
 
 # Codex 入口
 
-本技能集中处理 Codex 的宿主能力，并按任务调用六个通用技能。实验步骤、审计规则和
+本技能集中处理 Codex 的宿主能力，并按任务调用七个通用技能。实验步骤、审计规则和
 记录格式仍由通用技能维护，项目约定和用户已给出的授权继续适用。
 
 ## 选择入口与技能
@@ -25,6 +25,7 @@ description: "Codex entry point for design-code-like-a-human. Use in Codex for r
 | 开实验组、迭代、恢复或收尾 | [running-experiments-on-branches](../running-experiments-on-branches/SKILL.md) |
 | 写计划、指标、失败或组总结 | [recording-experiment-results](../recording-experiment-results/SKILL.md) |
 | 刷新索引、审计或判断 finding | [auditing-code-comments](../auditing-code-comments/SKILL.md) |
+| 新项目建目录、填 `layers` | [designing-project-layout](../designing-project-layout/SKILL.md) |
 
 ## 十项常用指令及配套操作
 

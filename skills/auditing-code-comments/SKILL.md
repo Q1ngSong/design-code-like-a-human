@@ -34,7 +34,7 @@ R1、R3 需要索引，C1 需要 Git。默认输出区 `runs/` 存在时，D2 �
 - 有复制进来的官方代码（如 `sd15/`），但没写 `vendored`——那些函数会被大量
   报 R0，而它们本来就不该按我们的标准写注释
 
-配置 `layers`、补充 `.gitignore`、确认索引范围或检查误入库文件时，参见 `references/setup.md`。
+配置 `layers` 见 `designing-project-layout`；补充 `.gitignore`、确认索引范围或检查误入库文件时，参见 `references/setup.md`。
 
 ## 无人值守
 

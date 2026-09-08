@@ -10,9 +10,9 @@ description: Use when planning, resuming, finishing, or summarizing experiments 
 
 ## 一组实验一个 CSV
 
-路径照抄输出目录去掉 `runs/` 和叶子 —— 输出在 `runs/ablation_study/lora_rank/{task}/`，
-记录就是 `experiments/ablation_study/lora_rank.csv`，
-一行一次实验：
+新组按论文用途放在 `Experiments/{部分}/{实验组}/results.csv`，例如
+`Experiments/ablation/lora_rank/results.csv`。已有 `experiments/` 大小写及组 CSV 布局继续沿用。
+CSV 的「输出目录」引用实际产物，两边不要求目录同构。一行一次实验：
 
 ```csv
 task,简介,指标,结论,输出目录
@@ -34,8 +34,18 @@ rank32_lr1e-4,再翻倍确认拐点,FID 14.1 / CLIP 0.271,"discard：过拟合�
 | `结论` | 以 keep / discard / crash / timeout 开头，说明原因和下一步。构建期也用这些状态，便于恢复时判断如何收尾 |
 | `输出目录` | 本次尝试的实际输出路径；`runs/` 是示例根目录，项目已有其他路径时沿用 |
 
-`task` 是本次实验设置的缩写，用于关联 CSV 记录、输出目录和 commit message。
+`task` 是本次实验设置的缩写，完整组路径 + task 用于关联 CSV 记录、输出目录和 commit message。
 三处使用同一个名称，不要另起简称，以免回查时需要逐一对应。
+
+## 原始证据与实验记忆
+
+以总览和实验组 README 导航，CSV 保存尝试，原始文件保留在输出区；不另建 memory JSON。
+记录、查找或汇总时按 [memory 约定](references/memory.md) 逐层读取、局部更新，
+由 Agent 执行 `scripts/memory.py` 的 `exp-plan` 登记计划、`exp-finish` 补结果、
+`exp-check` 检查引用。输出未定时先查 saving 规则，已有路径不重复分配。具体数字回源核对，
+查询全部结果先枚举目标范围。脚本负责安全写入和检查格式与引用，不判断结论是否正确。
+
+## 版本与提交关联
 
 **用 task 名查找对应版本。** 构建期和快速迭代 keep 的代码在实验分支的 commit 中，
 快速迭代 discard、crash、timeout 的代码改动在 stash 中。例如：
@@ -79,7 +89,8 @@ CSV 记录一起提交；快速迭代 discard 时，单独提交 CSV 记录，�
 原记录继续关联原源码快照，不能将旧指标挂到未经运行的新实现上。
 若原源码已无法恢复，明确标记该行不可复现，不编造对应版本。
 
-**每组实验使用一个 CSV 文件。** 需要总表时，汇总 `experiments/**/*.csv`。
+**每组实验使用一个 CSV 文件。** 需要总表时，枚举实际记录根目录下的 CSV；
+沿用项目的 `experiments/` 大小写，不只读取总览列出的少量结果。
 
 ## 失败的也要记
 

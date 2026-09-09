@@ -50,7 +50,8 @@ reference-codes/                           上游参考源码，只读、不入�
 experiments/ablation_study/timesteps.csv   实验记录，入库；路径照 outputs/ 去掉根和叶子
 outputs/ablation_study/timesteps/{task}/   实验产物，不入库：config.json、metrics.json、images/ …
 .gitignore                                 含 outputs*/、reference-codes/ 等，模板见 auditing-code-comments 的 references/setup.md
-README.md                                  安装、使用和方法说明
+PROJECT.md                                 给 Agent 的项目说明：研究什么、主体在哪、规矩与边界
+README.md                                  安装、使用和方法说明，给人看
 ```
 
 对应的声明：
@@ -91,17 +92,27 @@ README.md                                  安装、使用和方法说明
 多半直接把配置删了。拿不准顺序就先只写最内层那一个——这样没有最外层，核心层按最严的
 标准查，不会漏。
 
+## 顺带补一份项目入口
+
+根上的 `PROJECT.md` 是给 Agent 看的项目说明，README 是给人看的：前者写主体代码在哪、
+怎么跑一次、这个项目有哪些规矩和边界，后者写怎么装怎么用。模板、该写什么不该写什么、
+谁写什么时候改，见 [项目入口](references/project-entry.md)。
+
+已有结构、不需要拟树的项目也可以只补这一份，不必先整理目录。
+
 ## 产出
 
-两样一起给：拟定的树，和可以直接写进 `.comment-standard.json` 的建议值——`layers`，
-输出目录不叫 `runs` 的连同 `output_roots`，有第三方代码的连同 `vendored`：
+三样一起给：拟定的树、`PROJECT.md` 的骨架，和可以直接写进 `.comment-standard.json`
+的建议值——总是给 `layers`；输出目录不叫 `runs` 时再给 `output_roots`；有第三方代码时再给 `vendored`：
 
     "layers": ["drift", "scripts", "temp_scripts"],
     "vendored": ["vendor"],
     "output_roots": ["outputs"]
 
 **你不改 `.comment-standard.json`**，建议值由用户写进去；首次启用要不要开也先问用户，
-不自作主张创建（`auditing-code-comments` 的规矩）。补 `.gitignore`、索引范围、误入库文件，
+不自作主张创建（`auditing-code-comments` 的规矩）。`PROJECT.md` 是新文件，可以直接写，
+但「在研究什么」和「边界」两节只有用户知道：有人在场问一句再填，无人值守留空并在记录里
+说明留空的原因，不替用户编研究目标。补 `.gitignore`、索引范围、误入库文件，
 见 `auditing-code-comments` 的 `references/setup.md`。
 
 有人在场时确认或改一个字再动手。无人值守时只按实验计划给新文件、新目录定位置，依据写进

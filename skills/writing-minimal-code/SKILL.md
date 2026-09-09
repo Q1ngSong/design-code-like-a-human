@@ -15,7 +15,7 @@ description: Use before writing or changing any code in research or experiment c
 
 ## 先把情况看清楚
 
-动手前弄清楚这几件事，它们都能验证：
+动手前弄清楚这几件事：
 
 - **谁会用它。** 找出已有调用方；如果它本身是 CLI 子命令、实验脚本或外部调度任务，
   写明如何触发。根据这些调用和入口确认当前用途。

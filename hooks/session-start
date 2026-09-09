@@ -31,6 +31,11 @@ writing-python-comments。功能跑通后用 auditing-code-comments 审计。
 不要单独运行 codegraph sync —— 它会清空 docstring 回填结果。
 索引不用手工建，第一次跑上面这条命令时会自动建好。
 MSG
+    if [ -f "$root/PROJECT.md" ]; then
+      echo
+      echo "先读 $root/PROJECT.md —— 这个项目研究什么、主体代码在哪、有哪些规矩和边界。"
+      echo "它不写状态：当前结论看实验记录目录的 README，每次尝试看该组 CSV。"
+    fi
     s="$root/.codegraph/unattended"
     if [ -f "$s" ]; then
       if [ -n "$(find "$s" -mmin -1440 2>/dev/null)" ]; then

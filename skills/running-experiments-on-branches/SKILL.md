@@ -6,19 +6,18 @@ description: Use when starting, resuming, or closing a group of experiments - is
 # 实验跑在分支上
 
 **调参和实验不在主分支上跑。** 界线只有一条：改变主分支的操作要人来做，其余都归 agent。
-主分支只进人看过结果、明确说合的东西，用 `git merge --no-ff` 保留整条实验历史，主分支因此保持干净，
+主分支只保存人审阅过的结果、明确认可可以合并入主分支的工作，用 `git merge --no-ff` 保留整条实验历史，保证主分支的干净整洁，
 每个合并节点对应一个有结论的实验组。从主分支开分支、开几组、试什么、分支之间合并、回退、删分支，
 无人值守时自己控制，前提只有一个：每次尝试留下的 CSV 行、带 task 名的 commit、带路径的 stash 和
 方向级结论，足以让人事后看清自动化做了什么、为什么，支撑得起最终结论。
 主分支通过 `git log --first-parent` 浏览每组实验的合并节点，通过 `git log --graph --oneline --all`
 查看具体尝试。默认不 squash、不 rebase、不 cherry-pick 代替合并。
 
-分支名和目录名是模板，项目已有命名习惯时沿用。下文的提交、存档和恢复顺序相互配套，
-采用这套流程时需要一起遵守。
-
 ## 一组实验一个分支
 
 先读项目约定并检查 `git status --short`、`git branch -avv`、`git worktree list`。
+项目根有 `PROJECT.md` 的，看一眼它的「边界」一节——排除过的方向别再开一组，
+判据在那儿写着，这组算成还是算死按它判。
 确认实验的起点、第一合并目标及是否还要经过集成分支；`master`、`main`、`develop`
 只是常见名称，不能从当前所在分支猜目标，也不要为套模板新建 `develop`。
 已有分支时先恢复它，不重复创建。目标仍不明确时，有人在场就问一句；无人值守或用户已离场就不问：
@@ -45,9 +44,9 @@ git switch -c "$experiment_branch" "$baseline_sha"
     输出    runs/ablation_study/lora_rank/{task}/
     记录    experiments/ablation_study/lora_rank.csv
 
-例如，`main_results/baseline` 和 `badcases/baseline` 是不同组，三处都保留章节名以免重名。
-CSV 路径去掉输出根目录和最后一级 task 名，再加 `.csv`；stash message 则保留 task 名，
-用于区分同组的不同尝试。
+这三行里的 `ablation_study/lora_rank`、`runs`、`experiments` 都是默认名（本插件推荐使用）。但是如果项目已经在用自己设计好的实验组路径，就继续沿用现有的路径，避免造成新的理解压力。
+值得注意的是分支目录、输出目录和记录目录下的目录结构一定保持一致，形成统一的实验管理结构，比如三处都用同一个章节`ablation_study`、`main_results`作为次一级目录，保证用户能够将分支、输出、记录关联起来。此外，推荐使用章节名进行管理，可以有效避免相似的实验重名造成的混淆。
+CSV 路径去掉输出根目录和最后一级 task 名，再加 `.csv`；stash message 则保留 task 名，用于区分同组的不同尝试。
 
 **「一组」有多大、要不要新开分支，你自己判断，无人值守时也一样。** 判据是：这些实验会不会
 放在一起比较。几次相关的调参是一组，换个方向就该另起一组。
@@ -121,6 +120,9 @@ git commit -m "exp: rank8_lr1e-4_round1 —— keep"
            git stash push -u -m "ablation_study/lora_rank/lr0.04_bs4_round1"
            # 先确认剩余改动全属本次尝试；失败代码（含新文件）进 stash，记录留在分支
 ```
+
+**这套提交、stash 和恢复是配套的，要用就整套用。** 恢复靠 CSV 那行的结论判断上次走到
+哪一步，只 stash 代码不记 CSV，恢复时就没有依据。
 
 **每轮按下表调用相应技能，具体要求见各技能。**
 

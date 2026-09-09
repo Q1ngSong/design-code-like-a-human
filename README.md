@@ -38,7 +38,7 @@
 零调用者、反向依赖、缺失的变更记录、写死的写盘路径、标成 `[一次性]` 却放错层的代码。
 这些先由工具定位,不必靠人从头通读。是否处置,仍要结合上下文判断。
 
-**正在写的那一刻,用七个技能管。** 技能按 Claude 正在做的事自动触发:
+**正在写的那一刻,用技能管。** 技能按 Claude 正在做的事自动触发:
 写代码前先找现成实现、写盘前先确定目录、跑实验前先开分支。
 这些是习惯,规则替不了,但可以在动手那一刻提醒。
 
@@ -200,6 +200,7 @@ Codex 入口集中维护十项指令及配套操作：`/goal`、`/plan`、`/revi
 | 写会存文件的脚本 | `saving-experiment-outputs` | 动手前先说好输出存哪儿 |
 | 开始、恢复或结束一组实验 | `running-experiments-on-branches` | 从固定基线开分支，人看过结果、说合并后用 `--no-ff` 合回实际目标 |
 | 计划、运行或汇总实验 | `recording-experiment-results` | 跑前写计划，跑后补结果与版本关联 |
+| 想看实验谁基于谁、探索到哪了 | `visualizing-experiment-lineage` | 从 CSV 和 git 画一页自顶向下的谱系图 |
 | 功能跑通了想清理 | `auditing-code-comments` | 跑一遍审计,出一份报告 |
 
 ### 想主动触发就直接说
@@ -348,6 +349,7 @@ D1 说「核心层依赖了脚本层」，C1 要分清改的是别人依赖的�
 | `designing-project-layout` | 新项目、结构缺失、首次填 `layers` | 1 |
 | `recording-experiment-results` | 实验计划、恢复、结果与总结 | 6 |
 | `running-experiments-on-branches` | 实验开组、恢复、收尾与合并 | 6、8 |
+| `visualizing-experiment-lineage` | 看方法探索的谱系：谁基于谁、哪条路死了 | 6 |
 
 `writing-minimal-code` 是一条四道决策流：该不该存在 → 能不能改现有的 →
 新写的话代码从哪来 → 写成什么样。

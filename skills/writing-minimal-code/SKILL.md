@@ -1,6 +1,6 @@
 ---
 name: writing-minimal-code
-description: Use before writing or changing any code in research or experiment code - decide whether it needs to exist, whether a small edit to existing code does it, where new code should come from, and how small it can be (directory design, only when the project lacks structure, goes to designing-project-layout); also lists defensive code that must not be simplified away. Pair with writing-python-comments for the docstring format. 触发场景:写代码、改代码、修改代码、增加功能、新增某个功能、加个函数、实现某个特性、重构、简化代码、精简代码、优化代码、这段代码太复杂、代码结构乱。
+description: Use before writing or changing any code in research or experiment code - decide whether it needs to exist, whether a small edit to existing code does it, where new code should come from, and how small it can be (directory design, only when the project lacks structure, goes to designing-project-layout); when the thing being written is defined elsewhere (a paper's method, a reference implementation, a user-named algorithm), that definition sets the scope and any omission must be stated before writing; also lists defensive code that must not be simplified away. Pair with writing-python-comments for the docstring format. 触发场景:写代码、改代码、修改代码、引入论文方法、复现某个方法、换一个模块、加 if-else 切换新方法、增加功能、新增某个功能、加个函数、实现某个特性、重构、简化代码、精简代码、优化代码、这段代码太复杂、代码结构乱。
 ---
 
 # 动手之前
@@ -59,15 +59,28 @@ codegraph 的全文检索将连续汉字视为一个整体，只能从这段文�
 不能仅凭调用方数量判断风险：一个调用方可能是对外接口，多个行为相似的内部调用反而
 更容易调整。需要确认的是**调用方依赖哪些行为**：返回值形状、异常、副作用和调用顺序。
 
+## 先分清：复现完整度由谁定
+
+四道闸门问的是该不该写、写多大，前提是这东西的复现完整度由你定。
+
+引一篇论文的方法、照参考实现搬、用户点名要某个算法——完整度不由你定，**规格是它的
+原始定义**：论文的算法描述、官方实现、用户给的说明。动手前照规格把组成列一遍
+（损失项、调度、归一化、初始化、默认超参），然后让整件事过四道闸门，不要拿闸门去
+裁它的组件。某个组件说不出用处，是还没读懂，回去读，不是「还不需要」。
+
+要省略、替换或简化其中任何一项，先说再动手；快速迭代期没人可问，就写进 task 名和
+CSV `简介`（「简化实现：缺 A、B」），并且这一轮的数字只说明这个简化版，不能当成
+那个方法本身的结论。
+
 ## 第一道：该不该存在
 
 **没有当前用途的东西不写。** 这是个闸门，不通过就到此为止，后面三道都不用问。
 
 科研代码里最常见的多余，是为还没发生的实验提前铺路：留一个 `model_type`
 分派、抽一个 scheduler 基类、加一个「以后可能要换」的配置项。等真的要换时，
-需求形状往往和当初设想的不一样，那层抽象反而挡路。
+需求往往和当初设想的不一样，那层抽象反而挡路。
 
-说不出用处的，就是还不需要。
+说不出用处的，就是还不需要。照规格实现的除外，见上一节。
 
 ## 第二道：能不能改现有的
 
@@ -113,7 +126,7 @@ codegraph 的全文检索将连续汉字视为一个整体，只能从这段文�
 ## 第四道：写成什么样
 
 **最小可行实现应满足已确认的用途，并且不改变其他调用方依赖的行为。**
-空实现和「能跑不报错」都不算。在这个前提之上：
+空实现、「能跑不报错」、照规格缺件的简化版，都不算。在这个前提之上：
 
 - 不加没有调用点的参数、分支、配置项
 - 不为单一实现抽接口或基类
@@ -207,7 +220,8 @@ R1 只能列出审计范围内未找到调用方的函数，不能直接作为�
 ## 做完给用户回复
 
 代码先行。之后只说两件事：这次**没做**什么，以及什么条件下该补上。
-做了什么代码本身已经写着，不用复述。
+做了什么代码本身已经写着，不用复述。照规格实现的，对着动手前列的那份组成
+清单逐项说，别凭印象说都做了。
 
 无人值守的判定见 `auditing-code-comments`。此时同样这两件事
 写进这一轮的记录——`recording-experiment-results` 的 `结论` 列，或 commit

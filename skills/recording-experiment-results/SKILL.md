@@ -40,6 +40,8 @@ rank32_lr1e-4,再翻倍确认拐点,FID 14.1 / CLIP 0.271,"discard：过拟合�
 ## 原始证据与实验记忆
 
 以总览和实验组 README 导航，CSV 保存尝试，原始文件保留在输出区；不另建 memory JSON。
+想看这些尝试的谱系——谁基于谁、哪条路死了——用 `visualizing-experiment-lineage`
+从 CSV 和 git 渲染一页，它只读记录、不写记录。
 记录、查找或汇总时按 [memory 约定](references/memory.md) 逐层读取、局部更新，
 由 Agent 执行 `scripts/memory.py` 的 `exp-plan` 登记计划、`exp-finish` 补结果、
 `exp-check` 检查引用。输出未定时先查 saving 规则，已有路径不重复分配。具体数字回源核对，

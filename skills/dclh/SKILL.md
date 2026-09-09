@@ -21,6 +21,7 @@ description: "DCLH / dclh：design-code-like-a-human 插件的跨宿主统一入
 | 确定实验输出目录 | [saving-experiment-outputs](../saving-experiment-outputs/SKILL.md) |
 | 开实验组、迭代、恢复或收尾 | [running-experiments-on-branches](../running-experiments-on-branches/SKILL.md) |
 | 写计划、指标、失败或组总结 | [recording-experiment-results](../recording-experiment-results/SKILL.md) |
+| 看实验谱系：谁基于谁、哪条路死了 | [visualizing-experiment-lineage](../visualizing-experiment-lineage/SKILL.md) |
 | 刷新索引、审计或判断 finding | [auditing-code-comments](../auditing-code-comments/SKILL.md) |
 
 只有 `dclh` 而没有任务时，沿用当前已明确的任务；没有明确任务则询问要处理什么。

@@ -57,3 +57,4 @@ docs/
 # 因为 spec 直接依赖它们作为证据。
 references_proj/
 output/
+.agents/skills

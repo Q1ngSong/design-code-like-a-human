@@ -1,11 +1,14 @@
 ---
 name: saving-experiment-outputs
-description: Use before writing or editing any script that saves files (checkpoints, metrics, figures, logs) - settle where the output goes before writing code, by proposing a concrete directory and getting it confirmed, so experiment results stay tidy instead of accumulating as output/ results2/ test_final/. 触发场景:代码目录设计、目录结构怎么定、结果存哪里、输出放哪、保存 checkpoint、存模型、存日志、写会产生文件的脚本、中间文件太乱、文件散落。
+description: Use before writing or editing any script that saves files (checkpoints, metrics, figures, logs) - settle where the output goes before writing code, by proposing a concrete directory and getting it confirmed, so experiment results stay tidy instead of accumulating as output/ results2/ test_final/. 触发场景:结果存哪里、输出放哪、保存 checkpoint、存模型、存日志、写会产生文件的脚本、中间文件太乱、文件散落。
 ---
 
 # 保存路径：先说好存哪儿
 
 **要写盘的脚本，先把输出目录说定再动代码。** 就这一件事。
+本 Skill 管输出位置和写盘规则；实验记录由 `recording-experiment-results` 统一组织。
+确定 task、输出路径和路径基准后，由 recording 登记跑前计划；仅修改写盘脚本不自动创建实验。
+
 路径不先定，代码写着写着就长出 `output/`、`results2/`、`test_final/`,
 几周后没人说得清哪个是哪个。
 
@@ -22,7 +25,7 @@ description: Use before writing or editing any script that saves files (checkpoi
 习惯已经在那儿了，让他答题是替你填表。
 
 **项目还没有任何输出目录的**——没东西可照，这时才问：这次要回答什么、
-服务论文哪一节、这组变的是什么。三个答案拼成路径，从此就是这个项目的习惯。
+服务论文哪一节、这组变的是什么。这些答案拼成路径，从此就是这个项目的习惯。
 
 **项目已有的习惯优先于任何模板。** 已经在用 `exp/`、`logs/`、
 `checkpoints/2026-09-05/` 的，跟着它走，别去「纠正」成我们的形状。
@@ -60,8 +63,16 @@ runs/{服务论文哪一节}/{这组在试什么}/{本次变的是什么}/
 固定参数保存在本组配置或实验说明中，无需重复写入每个目录名。若多个参数同时变化，
 按这些尝试是否需要放在一起比较来判断是否拆组，不要仅凭名称长度或参数个数决定。
 
-叶子名同时是实验记录 CSV 里的 `task` 列——两边必须一字不差，
-那是 CSV 和 `runs/` 之间的连接键（见 `recording-experiment-results`）。
+运行目录的叶子名同时是实验记录 CSV 里的 `task` 列——两边必须一字不差，
+以 CSV 组路径 + task 识别尝试，通过输出目录列关联产物；记录与输出目录不要求同构（见 `recording-experiment-results`）。
+
+## 已有原始数据、重复评估或跨运行汇总
+
+沿用现有输出区：运行独有产物归本次 task；再次评估分配独立批次；跨运行图表归分析批次，
+记录输入集合和计算方式。改变输入或数值方法时新建批次，不覆盖旧报告引用的文件。
+共享输入只引用来源，不因研究问题变化而复制或搬移数据。评估/分析批次不替换原运行 task。
+需要追溯和机器校验时，使用
+[memory 读写约定](../recording-experiment-results/references/memory.md)。
 
 ## 写脚本时
 
@@ -82,8 +93,9 @@ plt.savefig(out / "loss.png")
 把叶子名单独取出来存进变量，跑完记录时直接用它写 CSV，两边不会写岔。
 
 **开跑前，若 `out` 已存在，先确认它属于哪次实验。** `exist_ok=True` 不会阻止复用目录，
-后续写入可能覆盖已有 checkpoint。若是上次崩溃留下的目录，增加 `round`，生成新的 task 名；
-若与另一组实验重名，换一个 task 名。两种情况下都要同步更新 `out`。
+后续写入可能覆盖已有 checkpoint。独立重跑增加 `round`，生成新的 task 名并同步更新 `out`；
+只有按实验恢复流程核对进程、代码、配置、输入和恢复点，确认接续同一次执行时才复用目录，
+并记录恢复过程。相同叶子名位于不同组可保留；完整输出路径撞到另一尝试时重新分配。
 
 直接在脚本入口组合路径，不要为此另写辅助模块。多个实验复用脚本时，将上层目录作为命令行参数。
 
@@ -96,8 +108,8 @@ plt.savefig(out / "loss.png")
   同样是错的 —— 错在这个写盘点自己拍了板。一次性脚本、探针也一样。
 
   `out = Path("runs") / ...` 仍相对于启动脚本时的当前工作目录（cwd）。从 `scripts/` 目录
-  启动，输出就位于 `scripts/runs/`。统一在入口组合路径后，将来改用命令行参数或以项目根
-  目录为基准时，只需修改这一处。
+  启动，输出就位于 `scripts/runs/`。入口必须明确并记录路径基准：若沿用相对路径，运行命令
+  固定启动目录；若支持任意目录启动，则按明确的项目/存储根解析输出位置。不要静默改变旧脚本的路径语义。
 
   审计规则 D3 查这条。
 - **输出目录必须被 `.gitignore` 忽略。** 否则 checkpoint 会进版本库。

@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>实验谱系</title>
+<style>
+/* 变量块与 skill-to-webpage 的 docs 主题一致;要换肤把别的主题变量贴进来覆盖即可。 */
+:root{--bg:#fafafa;--surface:#ffffff;--surface-2:#f4f4f6;--ink:#17181c;--ink-soft:#3c3f46;--muted:#7a7e88;--line:#e6e7eb;--accent:#4f46e5;--on-accent:#ffffff;--accent-soft:rgba(79,70,229,.09);--ok:#1a7f4e;--warn:#b45309;--chip:#eef0ff;--code-bg:#f6f7f9;--code-ink:#24292f;--radius:10px;--shadow:0 6px 22px rgba(23,24,28,.06);--font-body:-apple-system,"PingFang SC","Helvetica Neue","Microsoft YaHei",sans-serif;--font-mono:ui-monospace,"SF Mono",Menlo,Consolas,"Courier New",monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 var(--font-body)}
+header{position:sticky;top:0;z-index:5;background:var(--surface);border-bottom:1px solid var(--line);padding:12px 24px;display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center}
+h1{font-size:17px;margin:0}
+.meta{color:var(--muted);font-size:12px}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--ink-soft)}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none;background:var(--muted)}
+.dot.keep{background:var(--ok)}.dot.crash,.dot.timeout{background:var(--warn)}.dot.pending{background:transparent;border:2px dashed var(--muted)}.dot.unknown{background:#c026d3}
+.dash{width:22px;border-top:2px dashed var(--muted);display:inline-block}
+label.tog{font-size:12px;display:inline-flex;gap:5px;align-items:center;cursor:pointer;user-select:none}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:12px;padding:2px 9px;border-radius:999px;background:var(--chip);color:var(--accent);cursor:pointer;user-select:none;font-family:var(--font-mono)}
+.chip.off{opacity:.4}
+main{display:grid;grid-template-columns:minmax(0,1fr) 380px}
+#canvas{overflow:auto;padding:20px 24px 40px}
+.section{margin-bottom:34px}
+.section h2{font-size:15px;margin:0 0 2px}
+.section .sum{color:var(--ink-soft);font-size:13px;margin:0 0 6px}
+.section .groups{font-size:12px;color:var(--muted);margin:0 0 14px;line-height:1.7}
+.section .groups b{font-family:var(--font-mono);font-weight:600;color:var(--ink-soft)}
+.forest{position:relative}
+svg.edges{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
+svg.edges path{fill:none;stroke:#c9cbd3;stroke-width:1.6}
+svg.edges path.inferred{stroke-dasharray:5 4;stroke:var(--muted)}
+.node{position:absolute;width:212px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--muted);border-radius:var(--radius);padding:6px 9px 5px;box-shadow:var(--shadow);cursor:pointer;font-size:12px;line-height:16px}
+.node.keep{border-left-color:var(--ok)}.node.crash,.node.timeout{border-left-color:var(--warn)}.node.unknown{border-left-color:#c026d3}
+.node.pending{border-style:dashed;border-left-style:solid}
+.node.stub{background:var(--surface-2);border:1px dotted var(--muted);color:var(--muted);cursor:default}
+.node.dim{opacity:.28}
+.node.sel{outline:2px solid var(--accent);outline-offset:1px}
+.node .r{display:flex;gap:5px;align-items:center;white-space:nowrap;overflow:hidden}
+.node .t{font-family:var(--font-mono);font-weight:600;overflow:hidden;text-overflow:ellipsis;flex:none;max-width:150px}
+.node .m{color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+.node .g{color:var(--accent);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.node .c{color:var(--muted);font-family:var(--font-mono);font-size:11px;margin-top:2px}
+.node .c.inf{color:var(--warn)}
+aside{border-left:1px solid var(--line);background:var(--surface);padding:18px 20px;position:sticky;top:53px;height:calc(100vh - 53px);overflow:auto;font-size:13px}
+aside h3{margin:0 0 4px;font-size:14px;font-family:var(--font-mono)}
+aside .sub{color:var(--muted);font-size:12px;margin-bottom:10px}
+aside dl{margin:0}
+aside dt{color:var(--muted);font-size:11px;margin-top:9px}
+aside dd{margin:1px 0 0;white-space:pre-wrap;word-break:break-word}
+aside code{font-family:var(--font-mono);background:var(--code-bg);color:var(--code-ink);padding:1px 5px;border-radius:4px;font-size:12px}
+aside .row{border-top:1px dashed var(--line);margin-top:12px;padding-top:6px}
+aside .row:first-of-type{border-top:0;margin-top:0;padding-top:0}
+aside .st{display:inline-flex;align-items:center;gap:5px;font-weight:600}
+footer{grid-column:1/-1;padding:14px 24px 22px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;line-height:1.7}
+footer ul{margin:4px 0 0;padding-left:18px}
+footer b{color:var(--warn)}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">实验谱系</h1>
+  <span class="meta" id="meta"></span>
+  <span class="legend">
+    <span><i class="dot keep"></i>keep</span><span><i class="dot"></i>discard</span>
+    <span><i class="dot crash"></i>crash / timeout</span><span><i class="dot pending"></i>未跑完</span>
+    <span><i class="dash"></i>父按行序推断</span>
+  </span>
+  <label class="tog"><input type="checkbox" id="collapse">折叠 discard 叶</label>
+  <span class="chips" id="chips"></span>
+</header>
+<main>
+  <div id="canvas"></div>
+  <aside id="panel"><div class="sub">点一个节点,这里显示那行 CSV 的原文、commit 和输出目录。</div></aside>
+  <footer id="foot"></footer>
+</main>
+<script>
+const DATA = /*__LINEAGE_DATA__*/;
+const W = 212, GAP = 18, ROW = 16, PAD = 32, LEVEL_GAP = 46, STUB_H = 44;
+const ORDER = ['keep', 'pending', 'unknown', 'discard', 'crash', 'timeout'];
+const state = { collapse: false, dim: new Set(), selected: null };
+
+const nodes = new Map();
+DATA.external.forEach(e => nodes.set(e.id, { ...e, stub: true, rows: [], parent: null, section: null }));
+DATA.groups.forEach(g => g.nodes.forEach(n => nodes.set(n.id, { ...n, group: g.id, section: g.section })));
+nodes.forEach(n => { n.status = n.stub ? 'stub' : best(n.rows); n.children = []; });
+nodes.forEach(n => { if (n.parent && nodes.has(n.parent)) nodes.get(n.parent).children.push(n); else n.parent = null; });
+nodes.forEach(n => { if (n.stub && n.children.length) n.section = n.children[0].section; });
+const sections = [...new Set(DATA.groups.map(g => g.section))];
+
+function best(rows) { const s = rows.map(r => r.status); return ORDER.find(k => s.includes(k)) || 'unknown'; }
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function height(n) { return n.stub ? STUB_H : PAD + ROW * n.rows.length; }
+function visible(n) {
+  if (state.collapse && !n.stub && ['discard', 'crash', 'timeout'].includes(n.status) && !n.children.some(visible)) return false;
+  return true;
+}
+function entry(n) { return !n.parent || nodes.get(n.parent).group !== n.group; }
+
+function layout(roots) {
+  const pos = new Map(); let x = 0, depthMax = 0;
+  const kids = n => n.children.filter(visible);
+  const span = k => k.reduce((s, c) => s + width(c), 0) + GAP * Math.max(0, k.length - 1);
+  function width(n) { const k = kids(n); return k.length ? Math.max(W, span(k)) : W; }
+  function place(n, left, depth) {
+    const w = width(n), k = kids(n);
+    let cx = left + (w - span(k)) / 2;
+    k.forEach(c => { place(c, cx, depth + 1); cx += width(c) + GAP; });
+    pos.set(n.id, { x: left + (w - W) / 2, depth });
+    depthMax = Math.max(depthMax, depth);
+  }
+  roots.forEach(r => { place(r, x, 0); x += width(r) + GAP * 2; });
+  return { pos, width: x, depthMax };
+}
+
+function ortho(x0, y0, x1, y1) {
+  const ym = (y0 + y1) / 2, dx = x1 - x0;
+  if (Math.abs(dx) < 2) return `M${x0} ${y0} L${x1} ${y1}`;
+  const r = Math.min(8, Math.abs(dx) / 2), d = dx > 0 ? 1 : -1;
+  return `M${x0} ${y0} L${x0} ${ym - r} Q${x0} ${ym} ${x0 + d * r} ${ym} L${x1 - d * r} ${ym} Q${x1} ${ym} ${x1} ${ym + r} L${x1} ${y1}`;
+}
+
+function nodeEl(n) {
+  const el = document.createElement('div');
+  el.className = `node ${n.status}` + (state.dim.has(n.group) ? ' dim' : '') + (state.selected === n.id ? ' sel' : '');
+  if (n.stub) {
+    el.innerHTML = `<div class="g">来自 ${esc(n.group)}</div><div class="r"><span class="t">${esc(n.tasks.join(' '))}</span></div>`;
+    return el;
+  }
+  el.innerHTML = (entry(n) ? `<div class="g">${esc(n.group)}</div>` : '') +
+    n.rows.map(r => `<div class="r"><i class="dot ${r.status}"></i><span class="t" title="${esc(r.task)}">${esc(r.task)}</span><span class="m" title="${esc(r.metrics)}">${esc(r.metrics)}</span></div>`).join('') +
+    (n.commit ? `<div class="c">${esc(n.commit.slice(0, 7))}</div>` : `<div class="c inf">没有对应 commit</div>`);
+  el.onclick = () => select(n.id);
+  return el;
+}
+
+function drawSection(sec) {
+  const all = [...nodes.values()].filter(n => n.section === sec && visible(n));
+  const roots = all.filter(n => !n.parent);
+  const { pos, width, depthMax } = layout(roots);
+  const maxH = [];
+  pos.forEach((p, id) => { maxH[p.depth] = Math.max(maxH[p.depth] || 0, height(nodes.get(id))); });
+  const top = [0];
+  for (let d = 1; d <= depthMax; d++) top[d] = top[d - 1] + maxH[d - 1] + LEVEL_GAP;
+  const totalH = (top[depthMax] || 0) + (maxH[depthMax] || 0) + 10;
+
+  const wrap = document.createElement('div'); wrap.className = 'section';
+  const groups = DATA.groups.filter(g => g.section === sec);
+  wrap.innerHTML = `<h2>${esc(sec)}</h2>` +
+    (DATA.section_summary[sec] ? `<p class="sum">当前结论:${esc(DATA.section_summary[sec])}</p>` : '') +
+    `<div class="groups">` + groups.map(g => `<div><b>${esc(g.id)}</b>` +
+      (g.intro ? ` ${esc(g.intro)}` : '') +
+      (g.summary ? ` <span>· 总结:${esc(g.summary.purpose)} —— ${esc(g.summary.conclusion)}</span>` : '') + `</div>`).join('') + `</div>`;
+  const forest = document.createElement('div'); forest.className = 'forest';
+  forest.style.width = width + 'px'; forest.style.height = totalH + 'px';
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'edges'); svg.setAttribute('width', width); svg.setAttribute('height', totalH);
+  pos.forEach((p, id) => {
+    const n = nodes.get(id), el = nodeEl(n);
+    el.style.left = p.x + 'px'; el.style.top = top[p.depth] + 'px';
+    forest.appendChild(el);
+    if (!n.parent || !pos.has(n.parent)) return;
+    const pp = pos.get(n.parent), parent = nodes.get(n.parent);
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', ortho(pp.x + W / 2, top[pp.depth] + height(parent), p.x + W / 2, top[p.depth]));
+    if (n.parent_source === 'order') path.setAttribute('class', 'inferred');
+    svg.appendChild(path);
+  });
+  forest.prepend(svg);
+  wrap.appendChild(forest);
+  return wrap;
+}
+
+function draw() {
+  const canvas = document.getElementById('canvas');
+  canvas.innerHTML = '';
+  sections.forEach(sec => canvas.appendChild(drawSection(sec)));
+}
+
+function select(id) {
+  state.selected = id; draw();
+  const n = nodes.get(id), g = DATA.groups.find(g => g.id === n.group);
+  const parent = n.parent ? nodes.get(n.parent) : null;
+  const parentText = parent ? (parent.stub ? `来自 ${parent.group}:${parent.tasks.join(' ')}` : parent.rows.map(r => r.task).join(' ')) : '无(这组的起点)';
+  const dl = (rows) => rows.map(r => `<div class="row">
+    <div class="st"><i class="dot ${r.status}"></i>${esc(r.task)} <span class="sub" style="font-weight:400">${esc(r.status)}</span></div>
+    <dl><dt>简介</dt><dd>${esc(r.purpose)}</dd><dt>指标</dt><dd>${esc(r.metrics)}</dd><dt>结论</dt><dd>${esc(r.conclusion)}</dd>
+    <dt>输出目录</dt><dd><code>${esc(r.output)}</code></dd><dt>记录</dt><dd><code>${esc(g.csv)}:${r.line}</code>${r.stash ? ` &nbsp;代码在 <code>${esc(r.stash)}</code>` : ''}</dd></dl></div>`).join('');
+  document.getElementById('panel').innerHTML =
+    `<h3>${esc(n.group)}</h3><div class="sub">${esc(g.intro || '')}</div>` +
+    `<dl><dt>commit</dt><dd>${n.commit ? `<code>${esc(n.commit)}</code> ${esc(n.subject)}` : '<span style="color:var(--warn)">找不到带这个 task 名的 commit</span>'}</dd>` +
+    `<dt>基于</dt><dd>${esc(parentText)}${n.parent_source === 'order' ? '(按行序推断,不是 git 给的)' : ''}</dd></dl>` +
+    `<div style="margin-top:12px">${dl(n.rows)}</div>`;
+}
+
+function chips() {
+  const box = document.getElementById('chips');
+  DATA.groups.forEach(g => {
+    const c = document.createElement('span'); c.className = 'chip'; c.textContent = g.id.split('/').slice(1).join('/') || g.id;
+    c.title = g.id;
+    c.onclick = () => { state.dim.has(g.id) ? state.dim.delete(g.id) : state.dim.add(g.id); c.classList.toggle('off'); draw(); };
+    box.appendChild(c);
+  });
+}
+
+function foot() {
+  const inferred = [...nodes.values()].filter(n => n.parent && n.parent_source === 'order').length;
+  const total = [...nodes.values()].filter(n => !n.stub).length;
+  document.getElementById('foot').innerHTML =
+    `节点来自 <code>${esc(DATA.records)}/</code> 下各组的 CSV,边来自 git(哪次决策基于哪份代码),叙述来自各级 README;页面是派生物,改记录后重新生成。` +
+    `${total} 个决策` + (DATA.git ? (inferred ? `,其中 <b>${inferred}</b> 条边按行序推断(对不上 commit)。` : ',边全部来自 git。') : ';<b>没有 git</b>,边全按行序推断。') +
+    (DATA.notes.length ? `<ul>${DATA.notes.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : '');
+}
+
+document.getElementById('title').textContent = `实验谱系 · ${DATA.scope}`;
+document.getElementById('meta').textContent = `${DATA.root} · 生成于 ${DATA.generated.replace('T', ' ')}`;
+document.getElementById('collapse').onchange = e => { state.collapse = e.target.checked; draw(); };
+chips(); foot(); draw();
+</script>
+</body>
+</html>

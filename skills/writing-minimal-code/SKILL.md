@@ -1,6 +1,6 @@
 ---
 name: writing-minimal-code
-description: Use before writing or changing any code in research or experiment code - decide whether it needs to exist, whether a small edit to existing code does it, where new code should come from, and how small it can be; also lists defensive code that must not be simplified away. Pair with writing-python-comments for the docstring format. 触发场景:写代码、改代码、修改代码、增加功能、新增某个功能、加个函数、实现某个特性、重构、简化代码、精简代码、优化代码、这段代码太复杂、代码结构乱。
+description: Use before writing or changing any code in research or experiment code - decide whether it needs to exist, whether a small edit to existing code does it, where new code should come from, and how small it can be (directory design, only when the project lacks structure, goes to designing-project-layout); when the thing being written is defined elsewhere (a paper's method, a reference implementation, a user-named algorithm), that definition sets the scope and any omission must be stated before writing; also lists defensive code that must not be simplified away. Pair with writing-python-comments for the docstring format. 触发场景:写代码、改代码、修改代码、引入论文方法、复现某个方法、换一个模块、加 if-else 切换新方法、增加功能、新增某个功能、加个函数、实现某个特性、重构、简化代码、精简代码、优化代码、这段代码太复杂、代码结构乱。
 ---
 
 # 动手之前
@@ -15,14 +15,14 @@ description: Use before writing or changing any code in research or experiment c
 
 ## 先把情况看清楚
 
-动手前弄清楚这几件事，它们都能验证：
+动手前弄清楚这几件事：
 
 - **谁会用它。** 找出已有调用方；如果它本身是 CLI 子命令、实验脚本或外部调度任务，
   写明如何触发。根据这些调用和入口确认当前用途。
 - 输入从哪来、输出被谁消费、错误往哪传
 - 现有实现和已装依赖里有没有能用的
 
-项目启用了规范的（根目录有 `.comment-standard.json`），先刷新一次（第一次会自动建索引），再查：
+对于启用了索引规范的项目（也就是说根目录有 `.comment-standard.json`），先刷新一次（第一次会自动建索引），再查：
 
     python3 ../../scripts/refresh.py <项目根> --base HEAD    先跑这个;项目没进 git 或还没有 commit 就去掉 --base
     codegraph explore <关键词>     相关符号的源码 + 调用链 + 波及面，一次拿到
@@ -40,7 +40,7 @@ docstring，需要审计命令在 sync 后将其回填到索引。跳过回填�
 `sync` 按变动文件重建索引记录，会清除该文件所有函数的回填注释，包括未修改的函数。
 因此每次修改代码后都要重新刷新，不能只在首次运行时刷新。
 
-没启用规范的项目退回 `grep -rn` 和读文件，慢一点，但这一步不能跳。
+对于没启用规范的项目，使用 `grep -rn` 和直接读文件，慢一点，但这一步不能跳。
 
 **「现有实现里有没有能用的」必须真去搜，不能靠印象。** 这条最常被跳过，
 也最容易造出重复实现：项目里明明有个 `_normalize`，又写了一个
@@ -59,15 +59,28 @@ codegraph 的全文检索将连续汉字视为一个整体，只能从这段文�
 不能仅凭调用方数量判断风险：一个调用方可能是对外接口，多个行为相似的内部调用反而
 更容易调整。需要确认的是**调用方依赖哪些行为**：返回值形状、异常、副作用和调用顺序。
 
+## 先分清：复现完整度由谁定
+
+四道闸门问的是该不该写、写多大，前提是这东西的复现完整度由你定。
+
+引一篇论文的方法、照参考实现搬、用户点名要某个算法——完整度不由你定，**规格是它的
+原始定义**：论文的算法描述、官方实现、用户给的说明。动手前照规格把组成列一遍
+（损失项、调度、归一化、初始化、默认超参），然后让整件事过四道闸门，不要拿闸门去
+裁它的组件。某个组件说不出用处，是还没读懂，回去读，不是「还不需要」。
+
+要省略、替换或简化其中任何一项，先说再动手；快速迭代期没人可问，就写进 task 名和
+CSV `简介`（「简化实现：缺 A、B」），并且这一轮的数字只说明这个简化版，不能当成
+那个方法本身的结论。
+
 ## 第一道：该不该存在
 
 **没有当前用途的东西不写。** 这是个闸门，不通过就到此为止，后面三道都不用问。
 
 科研代码里最常见的多余，是为还没发生的实验提前铺路：留一个 `model_type`
 分派、抽一个 scheduler 基类、加一个「以后可能要换」的配置项。等真的要换时，
-需求形状往往和当初设想的不一样，那层抽象反而挡路。
+需求往往和当初设想的不一样，那层抽象反而挡路。
 
-说不出用处的，就是还不需要。
+说不出用处的，就是还不需要。照规格实现的除外，见上一节。
 
 ## 第二道：能不能改现有的
 
@@ -85,8 +98,6 @@ codegraph 的全文检索将连续汉字视为一个整体，只能从这段文�
 
 ### 什么时候才该新写
 
-三种情况：
-
 **老路径还要能跑。** 做对照实验时基线和新方法都得能跑，这时不能把老逻辑
 改掉。共用得多就给原函数加一个参数分支，几乎不共用才分开写。
 
@@ -95,6 +106,9 @@ codegraph 的全文检索将连续汉字视为一个整体，只能从这段文�
 
 **改原地会波及一堆本不需要变的调用方。** 比如为了一个新场景改掉返回值形状，
 其余十个调用方都得跟着改。这时加参数或加一个薄包装更划算。
+
+**改动会破坏现有测试。** 已有测试覆盖了旧行为，改动后需要大量重写测试。
+这时单独写一个新函数，保持旧测试不变，只为新函数补测试。
 
 除此之外，倾向于改原地。
 
@@ -113,7 +127,7 @@ codegraph 的全文检索将连续汉字视为一个整体，只能从这段文�
 ## 第四道：写成什么样
 
 **最小可行实现应满足已确认的用途，并且不改变其他调用方依赖的行为。**
-空实现和「能跑不报错」都不算。在这个前提之上：
+空实现、「能跑不报错」、按规格实现但缺少组件的简化版，都不算。在这个前提之上：
 
 - 不加没有调用点的参数、分支、配置项
 - 不为单一实现抽接口或基类
@@ -121,6 +135,13 @@ codegraph 的全文检索将连续汉字视为一个整体，只能从这段文�
 
 反过来，如果压缩之后需要读两遍才懂，或者把错误处理藏进了链式调用，
 就保持展开。行数少不是目标，能看懂才是。
+
+## 目录结构缺失时
+
+多数时候项目已经有结构，改动落在现有文件里，规划时说一句「改 `ovam/attention.py`，探针放
+`temp_scripts/`，输出存 `runs/...`」就够；输出路径画不画树都按 `saving-experiment-outputs` 说定。
+新项目、要加的东西没有落脚处、或平铺到分不清核心和脚本时，先调 `designing-project-layout`
+拟一份目录结构，拿到树再走四道。`[一次性]` 的探针不进核心层，放最外层或层外。
 
 **写出来的每个函数都要有 docstring，特殊方法（`__init__` 这类）除外。**
 格式、角色标记、`Args` 里该写什么、哪一层可以少写，见 `writing-python-comments`——
@@ -176,10 +197,10 @@ R1 只能列出审计范围内未找到调用方的函数，不能直接作为�
 
 快速迭代期间不为每次尝试逐条补 `变更:` 行；合并前对照主分支，统一说明最终保留的行为变化。
 
-**审计规则 C1 会查这条**,但它只是兜底:比对 `HEAD`(带 `--base` 时是那个 ref)找出签名或函数体变了、
-`变更:` 却没增加的函数。它数的是次数,判断不了内容——「第二道」里加参数那种
-改动它会报,但报了不等于你写对了,写一行没信息量的也能让它闭嘴。
-所以别指望它替你判断,该写的时候就写清楚。
+**审计规则 C1 会检查这一项**，但它只是兜底机制：对比 `HEAD`（带 `--base` 时是那个 ref）找出签名或函数体变了、
+`变更:` 却没增加的函数。它数的是次数，判断不了内容——「第二道」里加参数那种
+改动它会报，但报了不等于你写对了，写一行没信息量的也能通过检查。
+所以不要依赖工具判断，该写的时候就写清楚。
 
 规则的完整行为与处置见 `auditing-code-comments`。
 
@@ -193,14 +214,15 @@ R1 只能列出审计范围内未找到调用方的函数，不能直接作为�
 
 **这条只在构建期。** 快速迭代期（见 `running-experiments-on-branches`）没人可问，
 自己定——但四道闸门一道不少：该不该存在、能不能改现有的、代码从哪来、
-写成什么样。天平是同一架：五六处改动是同一个想法的自然延伸就做；
+写成什么样。判断标准一致：五六处改动是同一个想法的自然延伸就做；
 是在绕一个不合适的接口就不做，换个想法试。快速迭代里改错了 stash 掉很便宜，
 但一次尝试变成一次重构，跑出来的数字就说不清是想法有效还是结构变了。
 
 ## 做完给用户回复
 
 代码先行。之后只说两件事：这次**没做**什么，以及什么条件下该补上。
-做了什么代码本身已经写着，不用复述。
+做了什么代码本身已经写着，不用复述。照规格实现的，对着动手前列的那份组成
+清单逐项说，别凭印象说都做了。
 
 无人值守的判定见 `auditing-code-comments`。此时同样这两件事
 写进这一轮的记录——`recording-experiment-results` 的 `结论` 列，或 commit

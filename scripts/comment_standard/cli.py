@@ -131,8 +131,8 @@ def _mark_changed(findings, changes, files, proj):
        被当成存量、退出码给 0。
 
     抓不到的是图效应:删了一处调用点,让别的文件里没动过的函数新报 R1 ——
-    那个 finding 既不在改动函数里也不在改动文件里。合并前 --base main
-    全看一遍是为这个。D2 是文件级的,不会被标。
+    那个 finding 既不在改动函数里也不在改动文件里。合并前以 --base 指定实际接收分支，
+    同时查看存量 R1 是为这个。D2 是文件级的,不会被标。
 
     Args:
         findings: 全量 finding 列表。
@@ -179,8 +179,10 @@ def audit(proj, do_sync=True, base=None):
 
     Returns:
         dict,含 project / sync / backfilled / index_present / unindexed_files /
-        base / changed_functions / findings / summary / total / exit_code / rules。
-        两种输出格式都从它渲染,保证人看的和 agent 看的是同一份数据。
+        empty_layer_dirs / base / changed_functions / findings / summary / total /
+        exit_code / rules。两种输出格式都从它渲染,保证人看的和 agent 看的是同一份数据。
+
+    变更: 2026-09-10 返回值新增 empty_layer_dirs,其余字段与退出码不变。
     """
     # 必须在 sync 之前:否则这次同步仍按旧的 codegraph.json 建索引,
     # 用户刚改的范围要等下一次刷新才生效。
@@ -191,12 +193,17 @@ def audit(proj, do_sync=True, base=None):
     # sync 没成功但索引还在:图规则跑的是上一次的索引,内容可能已经过时。
     # 不逐文件比哈希,只把这个事实报出来 —— 便宜,而且够用。
     index_stale = bool(sync_msg) and index_present and not sync_msg.endswith("完成")
+    scope_files = proj.py_files_in_scope()
     # 索引只是辅助文件,不决定审计范围;但它落后于磁盘时图规则会漏掉新文件,
     # 这里把差集算出来点名 —— 让「索引过时」从悄无声息变成报告第一屏可见。
     unindexed = []
     if index_present:
         indexed = proj.indexed_files() or set()
-        unindexed = [f for f in proj.py_files_in_scope() if f not in indexed]
+        unindexed = [f for f in scope_files if f not in indexed]
+    # layers 里的目录名拼错、还没建、或被排除时,真正的代码不属于任何层,
+    # R2/D1 对它静默跳过。按磁盘点名,不看索引;vendored 不查,它被合法排除出索引很常见。
+    tops = {f.split("/", 1)[0] for f in scope_files}
+    empty_layer_dirs = sorted(d for group in proj.layers for d in group if d not in tops)
 
     # 改动集合只算一次:C1 用它判「改了没记」,打标用它判「落没落在改动上」。
     changes = rules_git.changed_functions(proj, base or "HEAD")
@@ -226,6 +233,7 @@ def audit(proj, do_sync=True, base=None):
         "index_present": index_present,
         "index_stale": index_stale,
         "unindexed_files": unindexed,
+        "empty_layer_dirs": empty_layer_dirs,
         "base": base,
         "changed_functions": (
             {rel: sorted(fns) for rel, fns in changes.items()} if base else {}
@@ -282,11 +290,14 @@ def render_markdown(result):
 
     Returns:
         str,完整的 Markdown 文档。
+
+    变更: 2026-09-10 声明的层匹配不到代码时,头部标「结果不完整」并点名,概览不再写「全部合规」。
     """
     name = Path(result["project"]).name
     when = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     skipped = [] if result["index_present"] else ["R1", "R2", "R3", "D1"]
     unindexed = result.get("unindexed_files") or []
+    empty_dirs = result.get("empty_layer_dirs") or []
     stale = bool(result.get("index_stale"))  # 同步失败:图规则跑了,但查的是旧图
     idx = "有" if result["index_present"] else "无"
     if unindexed:
@@ -303,7 +314,7 @@ def render_markdown(result):
         "",
         f"{when}{where}{diff}  ·  索引:{idx}  ·  回填 {result['backfilled']} 条  ·  "
         f"**{result['total']} 处不合规**"
-        + ("（**结果不完整**）" if (skipped or unindexed or stale) else ""),
+        + ("（**结果不完整**）" if (skipped or unindexed or stale or empty_dirs) else ""),
         "",
     ]
     if skipped:
@@ -311,6 +322,12 @@ def render_markdown(result):
             f"> **结果不完整。** 本次没有索引，{'、'.join(skipped)} 未执行，",
             "> 下面只有注释规则的结果。条数比完整审计少是因为规则没跑，",
             "> 不代表这些问题已经解决。",
+            "",
+        ]
+    if empty_dirs:
+        lines += [
+            f"> **结果不完整。** `layers` 里声明的 {'、'.join(empty_dirs)} 在审计范围内没有 .py 文件，R2/D1 对它不生效。",
+            "> 常见原因：目录名拼错、目录还没建、目录里没有 .py 文件、被 codegraph exclude 或 `.gitignore` 排除。",
             "",
         ]
     if result["sync"]:
@@ -323,7 +340,7 @@ def render_markdown(result):
         lines.append(f"| {rule} | {RULE_TITLES.get(rule, '')} | **未执行** |")
     if not result["summary"]:
         # 有规则没跑就不能说「全部合规」—— 那只是已跑的那几条没发现。
-        lines.append("| — | 已执行的规则无发现 | 0 |" if (skipped or unindexed or stale) else "| — | 全部合规 | 0 |")
+        lines.append("| — | 已执行的规则无发现 | 0 |" if (skipped or unindexed or stale or empty_dirs) else "| — | 全部合规 | 0 |")
     lines.append("")
 
     if base:
@@ -384,6 +401,8 @@ def render_text(result):
 
     Returns:
         str,多行。
+
+    变更: 2026-09-10 顶部环境信息新增一行,点名匹配不到代码的层目录。
     """
     lines = []
     if result.get("codegraph_config"):
@@ -397,6 +416,10 @@ def render_text(result):
     if unindexed:
         lines.append(f"索引落后于磁盘:{len(unindexed)} 个文件不在索引里,图规则没查到它们 —— "
                      + ", ".join(unindexed[:5]) + (" …" if len(unindexed) > 5 else ""))
+    empty_dirs = result.get("empty_layer_dirs") or []
+    if empty_dirs:
+        lines.append(f"声明的层没有匹配到代码:{', '.join(empty_dirs)} —— "
+                     "R2/D1 对这些目录不生效(拼错、还没建、没有 .py 文件,或被排除出审计范围)")
     if not result["index_present"]:
         lines.append("未找到 codegraph 索引,已跳过 R1/R2/R3/D1。"
                      "建索引没成功,看上面 sync 那行的原因。")
@@ -430,6 +453,8 @@ def render_text(result):
 def main(argv=None):
     """命令入口。[主线]
 
+    变更: 2026-09-07 --base 帮助改为实际接收分支，保留原有参数和审计行为。
+
     Args:
         argv: 参数列表,None 时取 sys.argv[1:]。
             位置参数是项目路径(默认当前目录);
@@ -446,7 +471,7 @@ def main(argv=None):
     ap.add_argument("--json", action="store_true", help="输出 JSON 给 agent 解析")
     ap.add_argument("--base", metavar="REF",
                     help="差异审阅:标出相对这个 git ref 改过的函数上的告警。"
-                         "快速迭代跑前用 HEAD(圈出工作区里这次的改动),合并前用 main。"
+                         "快速迭代跑前用 HEAD(圈出工作区里这次的改动),合并前用实际接收分支（main、master或者上一级分支等）。"
                          "省略则全仓库审阅")
     args = ap.parse_args(argv)
 

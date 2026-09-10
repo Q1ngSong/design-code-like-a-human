@@ -110,7 +110,8 @@ README.md                                  安装、使用和方法说明，给�
     "output_roots": ["outputs"]
 
 **你不改 `.comment-standard.json`**，建议值由用户写进去；首次启用要不要开也先问用户，
-不自作主张创建（`auditing-code-comments` 的规矩）。`PROJECT.md` 是新文件，可以直接写，
+不自作主张创建（`auditing-code-comments` 的规矩）。用户写进去之后跑一次审计，`empty_layer_dirs` 为空
+才算生效，不为空说明有目录名对不上，R2/D1 对它静默跳过。`PROJECT.md` 是新文件，可以直接写，
 但「在研究什么」和「边界」两节只有用户知道：有人在场问一句再填，无人值守留空并在记录里
 说明留空的原因，不替用户编研究目标。补 `.gitignore`、索引范围、误入库文件，
 见 `auditing-code-comments` 的 `references/setup.md`。

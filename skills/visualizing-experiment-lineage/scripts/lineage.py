@@ -142,28 +142,34 @@ def git_out(root, *args):
     return proc.stdout if proc.returncode == 0 else None
 
 
+# 正文里声明「这次提交记录了它的结果」的行:批量提交标题放不下 task 名时,每个 task 写一行。
+TASK_LINE = re.compile(r"^Task:[ \t]*(\S+)[ \t\r]*$", re.MULTILINE)
+
+
 def git_history(root):
-    """一次读完仓库历史:每个 commit 的父、标题、改了哪些文件。[主线]
+    """一次读完仓库历史:每个 commit 的父、标题、正文的 `Task:` 行、改了哪些文件。[主线]
 
     Args:
         root: 项目根目录。
 
     Returns:
         (prefix, history) —— prefix 是项目根相对仓库根的前缀(monorepo 时非空),
-        history 是 {sha: {"parents", "subject", "files"}}。合并提交的 files 为空,
+        history 是 {sha: {"parents", "subject", "tasks", "files"}}。tasks 是正文里
+        `Task: <task名>` 行列出的名字。合并提交的 files 为空,
         这是 git 的默认行为,正好让合并节点永远不算「改了代码」。
         不是 git 仓库返回 (None, None);空仓库返回 (prefix, {})。
     """
     prefix = git_out(root, "rev-parse", "--show-prefix")
     if prefix is None:
         return None, None
+    # 正文可能有多行,用 \x1d 标出 message 的结尾,其后才是 --name-only 的文件列表
     log = git_out(root, "log", "--branches", "--tags", "--remotes", "--topo-order",
-                  "--format=%x1e%H%x1f%P%x1f%s", "--name-only") or ""
+                  "--format=%x1e%H%x1f%P%x1f%s%x1f%b%x1d", "--name-only") or ""
     history = {}
     for record in log.split("\x1e")[1:]:
-        head, _, files = record.partition("\n")
-        sha, parents, subject = head.split("\x1f")
-        history[sha] = {"parents": parents.split(), "subject": subject,
+        head, _, files = record.partition("\x1d")
+        sha, parents, subject, body = head.split("\x1f", 3)
+        history[sha] = {"parents": parents.split(), "subject": subject, "tasks": TASK_LINE.findall(body),
                         "files": [f for f in files.split("\n") if f.strip()]}
     return prefix.strip(), history
 
@@ -205,6 +211,8 @@ def match_decisions(groups, history, prefix, records_name):
     Returns:
         dict,{sha: {"group": 组 id, "rows": [行...], "code": 是否改了记录以外的文件}}。
         一行只认最早提到它的那个 commit —— 跑完提交的那次;之后总结行再提它,不算。
+        「提到」只认两处:标题里的 task 名,正文里的 `Task: <task名>` 行。正文其他句子里的
+        task 名不算 —— 「开一组」这类计划提交常在正文里写到还没跑的 task,算上就会配错。
         同名 task 可能出现在不同组,所以还要求这个 commit 改过本组的 CSV。
     """
     records_prefix = f"{prefix}{records_name}/"
@@ -216,8 +224,8 @@ def match_decisions(groups, history, prefix, records_name):
             group = csv_of.get(path)
             if group is None:
                 continue
-            rows = [r for r in group["rows"]
-                    if r.get("commit") is None and name_re(r["task"]).search(entry["subject"])]
+            rows = [r for r in group["rows"] if r.get("commit") is None
+                    and (name_re(r["task"]).search(entry["subject"]) or r["task"] in entry["tasks"])]
             if not rows:
                 continue
             for r in rows:

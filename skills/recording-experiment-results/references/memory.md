@@ -80,7 +80,7 @@ python /path/to/recording-experiment-results/scripts/memory.py exp-check --root 
 ```
 
 `--records` 按实际根目录填写，例如 `experiments`；`--scope` 相对于它，可指定组目录或单个文件。
-`exp-check` 递归检查选定范围的 CSV、Markdown，检查引用关系，不要求目录同构、不修改任何文件。
+`exp-check` 递归检查选定范围内的 CSV 和 Markdown，按文件里写的路径核对引用，不假设记录和产物的目录一一对应，也不修改任何文件。
 
 - CSV：标准五列、组内唯一 task、计划和输出路径；完成状态、指标非空及输出目录存在。
   空结论保持未完成，允许尚未创建输出；`summary` 不要求状态前缀或输出叶子同名，可无基线。

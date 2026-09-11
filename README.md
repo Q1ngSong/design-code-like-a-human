@@ -213,7 +213,7 @@ Codex 入口集中维护十项指令及配套操作：`/goal`、`/plan`、`/revi
 | 新项目、结构缺失或首次填 `layers` | `designing-project-layout` | 拟一份能直接写成 `layers` 的目录结构 |
 | 写 Python 函数 | `writing-python-comments` | 按标准写 docstring:摘要 + 角色标记 + Args/Returns |
 | 写会存文件的脚本 | `saving-experiment-outputs` | 动手前先说好输出存哪儿 |
-| 开始、恢复或结束一组实验 | `running-experiments-on-branches` | 从固定基线开分支，人看过结果、说合并后用 `--no-ff` 合回实际目标 |
+| 开始、恢复或结束一组实验；在文档、论文、工具分支上干活 | `running-experiments-on-branches` | 从固定基线开分支和 worktree，人看过结果、说合并后用 `--no-ff` 合回实际目标 |
 | 计划、运行或汇总实验 | `recording-experiment-results` | 跑前写计划，跑后补结果与版本关联 |
 | 想看实验谁基于谁、探索到哪了 | `visualizing-experiment-lineage` | 从 CSV 和 git 画一页自顶向下的谱系图 |
 | 功能跑通了想清理 | `auditing-code-comments` | 跑一遍审计,出一份报告 |
@@ -268,6 +268,14 @@ Codex 入口集中维护十项指令及配套操作：`/goal`、`/plan`、`/revi
   `git log --graph --oneline --all` 看详细历史。经过 `develop` 时，主分支节点可能汇集多组实验。
 - 失败实验也保留记录；不保留的实现恢复到开组基线再合并。比较性扫描可以保留基线，不强行挑赢家。
 - 合并后实验分支留不留由 agent 定，默认保留。合并、推送和输出备份分别验证；本地 stash 不随分支推送。
+
+**每组一个 worktree，不能滥用。** 注册一组实验就是从基线分出一个 worktree，放在项目旁边的容器目录
+`proj.worktrees/{部分}/{组}`。分支、worktree、输出、记录用同一个组路径，worktree 在 Git 里的内部名统一为
+`{项目名}-{组}`。组里的 task、轮次、重跑和修问题都在这个 worktree 里做，做完再合并回去，不为单个实验、
+单次运行或一次修改另开 worktree。文档（`docs/`）、论文（`paper/`）、工具（`tool/`）分支也照此处理。
+git 合并只带走入库文件，worktree 里未入库的输出和记录要在合并时搬进目标目录，原处留软链接。worktree 默认保留，
+只在以下情况删除：重新注册同一组，用户要求合并并删除，或用户明确要删。步骤和脚本见
+[worktree 的合并与删除](skills/running-experiments-on-branches/references/worktree-merge.md)。
 
 **改主分支的事要人来做，分支上的事 agent 自己控制。** 开分支、分支间合并、回退、删分支都不用等人；
 到点只收尾到合并前一步（记录、收尾 commit、审计、验证、交接报告），合不合、合到哪由人看过结果后决定。

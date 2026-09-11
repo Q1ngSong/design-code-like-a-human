@@ -22,7 +22,7 @@ description: "Codex entry point for design-code-like-a-human. Use in Codex for r
 | 写或修改科研代码 | [writing-minimal-code](../writing-minimal-code/SKILL.md) |
 | 写 Python 注释和行为变更记录 | [writing-python-comments](../writing-python-comments/SKILL.md) |
 | 确定实验输出目录 | [saving-experiment-outputs](../saving-experiment-outputs/SKILL.md) |
-| 开实验组、迭代、恢复或收尾 | [running-experiments-on-branches](../running-experiments-on-branches/SKILL.md) |
+| 开实验组（注册 worktree）、迭代、恢复或收尾；文档、论文、工具分支的 worktree 与合并 | [running-experiments-on-branches](../running-experiments-on-branches/SKILL.md) |
 | 写计划、指标、失败或组总结 | [recording-experiment-results](../recording-experiment-results/SKILL.md) |
 | 看实验谱系：谁基于谁、哪条路死了 | [visualizing-experiment-lineage](../visualizing-experiment-lineage/SKILL.md) |
 | 刷新索引、审计或判断 finding | [auditing-code-comments](../auditing-code-comments/SKILL.md) |

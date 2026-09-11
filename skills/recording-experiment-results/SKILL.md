@@ -11,8 +11,10 @@ description: Use when planning, resuming, finishing, or summarizing experiments 
 ## 一组实验一个 CSV
 
 新组按论文用途放在 `experiments/{部分}/{组}/results.csv`，例如
-`experiments/ablation_study/lora_rank/results.csv`。已有 `experiments/` 大小写及组 CSV 布局继续沿用。
-CSV 的「输出目录」引用实际产物，两边不要求目录同构。一行一次实验：
+`experiments/ablation_study/lora_rank/results.csv`。已有项目的记录目录名（包括和 `experiments/` 不同的大小写）及组 CSV 布局继续沿用。
+CSV 的「输出目录」列写实际产物的路径，记录和产物靠这一列对上。新组的记录和产物使用同一个组路径 `{部分}/{组}`
+（见 `running-experiments-on-branches`），但不要求目录同构：记录是一组一个 `results.csv`，产物按 task 分目录，
+已有项目的产物还可能放在别的根目录下。一行一次实验：
 
 ```csv
 task,简介,指标,结论,输出目录

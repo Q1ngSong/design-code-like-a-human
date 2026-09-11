@@ -1,6 +1,6 @@
 ---
 name: running-experiments-on-branches
-description: Use when starting, resuming, or closing a group of experiments - isolate runs on a branch, record the baseline and results, then preserve experiment history with a no-ff merge into the project's actual target branch. 触发场景:调参、跑实验、做消融、实验结束、实验收尾、合回 master 或 main、实验怎么用 git 管。
+description: Use when starting, resuming, or closing a group of experiments, or any other branch worked on in its own worktree (docs, paper, tool) - register the work as a worktree branched from a fixed baseline, record the baseline and results, then preserve history with a no-ff merge into the project's actual target branch. 触发场景:调参、跑实验、做消融、实验结束、实验收尾、合回 master 或 main、实验怎么用 git 管、开 worktree、文档或论文分支合并。
 ---
 
 # 实验跑在分支上
@@ -13,6 +13,11 @@ description: Use when starting, resuming, or closing a group of experiments - is
 主分支通过 `git log --first-parent` 浏览每组实验的合并节点，通过 `git log --graph --oneline --all`
 查看具体尝试。默认不 squash、不 rebase、不 cherry-pick 代替合并。
 
+**非实验分支也走这套流程。** 文档（`docs/`）、论文（`paper/`）、工具（`tool/`）等分支和实验分支（`exp/`）一样：
+注册同样是分出一个 worktree，不能滥开；在 worktree 里做完，人看过并同意后才合进主分支，合并用 `--no-ff`，合并时处理未入库的数据；
+worktree 默认保留。分支前缀只表示工作类型，合并提交标题的前缀随分支类型定。没有运行记录的分支，
+跳过依赖运行记录的步骤（CSV 行、总结行、记录检查）。分支前缀 `docs/` 和提交前缀 `record:`（下文只提交记录行时用）是两回事。
+
 ## 一组实验一个分支
 
 先读项目约定并检查 `git status --short`、`git branch -avv`、`git worktree list`。
@@ -24,6 +29,16 @@ description: Use when starting, resuming, or closing a group of experiments - is
 基线取当前 HEAD（`baseline_sha=$(git rev-parse HEAD)`），开组记录里合并目标写「待定」，迭代照常。
 合并目标只影响收尾要不要本地合并，收尾时仍不明确就停在本地实验分支，交接报告列出候选目标让用户选。
 
+**注册一组实验，就是从基线分出一个 worktree；worktree 不能滥用。** 一个组（`experiments/{部分}/{组}`）只开一个分支、一个 worktree，
+不为单个实验、单次运行或一次修改另开。worktree 放在父目录的容器目录里（位置规则见「每组一个 worktree」）。
+改代码、跑、修问题、写记录都在这个 worktree 里做：跑不通或发现代码有问题，就在这里改完接着跑，不回主分支改；
+做完再合并回目标分支。
+
+不在主目录里用 `git switch -c` 开组：同一个仓库常有几个会话同时在用，切分支会换掉别人正在跑的代码。
+别人在用的目录里不切分支、不 stash、不 reset、不改文件。判断有没有人在用，先看 `git worktree list`，
+再看有没有会话或进程的当前目录在那里（macOS/Linux 可用 `lsof -a -d cwd`）。当前目录只是线索，
+会话也可能在别处用 `git -C` 操作，拿不准就当有人在用。
+
 以下是 **Bash 示例**；在 PowerShell 中使用对应语法，逐步检查退出码。
 假设项目约定直接合回 `master`，且起点也是 `master`：
 
@@ -31,22 +46,51 @@ description: Use when starting, resuming, or closing a group of experiments - is
 target_branch=master
 experiment_branch=exp/ablation_study/lora_rank
 baseline_sha=$(git rev-parse --verify "${target_branch}^{commit}")
-git switch -c "$experiment_branch" "$baseline_sha"
+main_dir=$(git worktree list --porcelain | sed -n '1s/^worktree //p')   # 主目录
+wt_dir="$main_dir.worktrees/ablation_study/lora_rank"                    # 容器里的本组目录：{部分}/{组}
+named_dir="$(dirname "$wt_dir")/$(basename "$main_dir")-${wt_dir##*/}"  # 先建在 {项目名}-{组}，定下内部名
+git worktree add -b "$experiment_branch" "$named_dir" "$baseline_sha"
+git worktree move "$named_dir" "$wt_dir"
+cd "$wt_dir"
 ```
 
-将实验分支、固定的 `baseline_sha`、实际合并目标链及完整运行配置写入本组记录或其链接的
+将实验分支、worktree 路径、固定的 `baseline_sha`、实际合并目标链及完整运行配置写入本组记录或其链接的
 说明文件并入库。基线是开组时的提交，后续恢复不能改用已经向前移动的主分支。
 工作区有无关改动时先处理，方式见 `recording-experiment-results`：有人在场问一句，无人值守提交成 `chore:`；不丢弃、不 stash 用户的工作。
 
-分支、输出目录和记录文件使用相同的实验组路径：
+**必要时可以把主分支的新代码合进实验分支。** 例如主分支修复了本组也需要的 bug。
+在本组 worktree 里合并，运行仍在读取代码时不合并。合并前执行
+[worktree 的合并与删除](references/worktree-merge.md) 第 1 步的检查，
+以本组 worktree 为目标，检查是否会覆盖其中被忽略的文件：
 
-    分支    exp/ablation_study/lora_rank
-    输出    runs/ablation_study/lora_rank/{task}/
-    记录    experiments/ablation_study/lora_rank/results.csv
+```bash
+git merge --no-ff -m "merge: $target_branch 合入 $experiment_branch —— 带入 <什么>，供 <做什么>" "$target_branch"
+```
 
-这三行里的 `ablation_study/lora_rank`、`runs`、`experiments` 都是默认名（本插件推荐使用）。但是如果项目已经在用自己设计好的实验组路径，就继续沿用现有的路径，避免造成新的理解压力。
-分支目录、输出目录和记录目录下的目录结构必须保持一致，形成统一的实验管理结构，比如三处都用同一个章节 `ablation_study`、`main_results` 作为次一级目录，保证用户能够将分支、输出、记录关联起来。推荐使用章节名进行管理，可以避免相似的实验重名造成的混淆。
-CSV 路径去掉输出根目录和最后一级 task 名，再加 `.csv`；stash message 则保留 task 名，用于区分同组的不同尝试。
+合并后在记录里 `baseline_sha` 旁补一行同步点（合并进来的主分支提交）。之后审阅本组自己的改动用
+`git diff "$target_branch"...HEAD`（三个点，从最近的共同提交算起）。恢复实现时以最近的同步点为准，
+恢复到 `baseline_sha` 会连合进来的主分支内容一起撤掉。
+
+分支、worktree、输出目录和记录文件使用相同的实验组路径：
+
+    分支      exp/ablation_study/lora_rank
+    worktree  proj.worktrees/ablation_study/lora_rank/     git 内部名 proj-lora_rank
+    输出      runs/ablation_study/lora_rank/{task}/
+    记录      experiments/ablation_study/lora_rank/results.csv
+
+这几行里的 `ablation_study/lora_rank`、`runs`、`experiments` 都是本插件推荐的默认名。项目已经有自己的实验组路径时，沿用现有路径，免得增加理解负担。
+分支、worktree、输出、记录必须使用同一个组路径 `{部分}/{组}`（上例都含 `ablation_study/lora_rank`），用户才能把它们对上。
+要求相同的只有组路径。根目录各不相同（`exp/`、`proj.worktrees/`、`runs/`、`experiments/`），组路径以下的内容也不一样：输出按 task
+分目录，记录是一组一个 `results.csv`，两边不必一一对应，靠 CSV 的「输出目录」列关联。`recording-experiment-results`
+说的「不要求目录同构」，指的就是根目录和组路径以下这两部分。`{部分}` 推荐用章节名，避免相似的实验重名混淆。
+记录放在 `experiments/{部分}/{组}/results.csv`，其中 `{部分}/{组}` 就是输出目录去掉输出根目录和最后一级 task 名；stash message 则保留 task 名，用于区分同组的不同尝试。
+
+**命名。** 实验分支用 `{类型}/{部分}/{组}`，如 `exp/main-result/prompt-diversity`。没有 `{部分}` 的非实验分支用
+`{类型}/{名}`，如 `paper/draft-v1`、`tool/codex-isolated`、`docs/ledger-status`，worktree 放在 `proj.worktrees/{类型}/{名}`。
+worktree 在 Git 里的内部名（`.git/worktrees/` 下的目录名）统一为 `{项目名}-{组}`，非实验分支是 `{项目名}-{名}`，
+如 `proj-lora_rank`、`proj-draft-v1`。Git 取建 worktree 时路径的最后一级作内部名，没有参数能另行指定，所以先建在
+`{项目名}-{组}` 这一级，再用 `git worktree move` 移到 `{部分}/{组}`；移动不改内部名。项目目录名里的空格会变成 `-`；
+不同部分下有同名的组时，Git 会在内部名后面加数字（`proj-baseline1`）。
 
 **「一组」有多大、要不要新开分支，你自己判断，无人值守时也一样。** 判据是：这些实验会不会
 放在一起比较。几次相关的调参是一组，换个方向就该另起一组。
@@ -84,11 +128,38 @@ commit 正文和 CSV 的 `结论` 列。提交命令可写成 `git commit -m "�
 exp: rank4 rank8 rank16 rank32 —— 定在 16
 ```
 
+**标题放不下时，task 名移到正文的 `Task:` 行。** `git log --oneline`、分支图和托管平台的提交列表
+只显示单行标题。task 多或名字长，全部列入标题会超过约 72 个字符时，标题只写组名、task 数和结论，
+正文每个 task 写一行 `Task: <task名>`：
+
+```
+exp: lora_rank 扫描（12 个 task）—— 定在 rank16
+
+Task: rank4_lr1e-4_round1
+Task: rank8_lr1e-4_round1
+……
+```
+
+**判断一个提交记录了哪些 task 的结果，只认两处：标题里的 task 名，正文里的 `Task:` 行。**
+正文其他句子里出现的 task 名不算。开一组时写计划就是这种情况：
+
+```
+exp: 开一组 —— LoRA rank 扫描
+
+计划：先跑 rank8_lr1e-4_round1，过拟合即止
+```
+
+示例中的 `rank8_lr1e-4_round1` 还没运行，因此这次提交不记录它的结果。
+`visualizing-experiment-lineage` 只按标题里的 task 名和正文里的 `Task:` 行关联 CSV 行与提交。
+开组提交通常会写入 CSV 计划行，时间也最早；若把正文叙述中的 task 名算进去，CSV 行就会关联到计划提交，
+谱系会指向尚未修改的代码。记录结果时，task 名必须写在标题或 `Task:` 行里。
+`git log --grep` 仍搜索整条 message，不受这项关联规则影响。
+
 **一次决策一个 commit，代码和 CSV 那行一起：**
 
 ```bash
 # 跑完后补齐开跑前写入的 CSV 记录，然后：
-git add train.py experiments/ablation_study/lora_rank.csv
+git add train.py experiments/ablation_study/lora_rank/results.csv
 git commit -m "exp: rank8_lr1e-4_round1 —— keep"
 ```
 
@@ -304,7 +375,7 @@ Codex 的 workspace-write 沙箱把 `.git` 整个设为只读，commit 和 stash
 构建期最后一次可能是失败代码；快速迭代通常停在最后一次 keep，仍需核对人工改判等情况。
 有明确选择就恢复选定设置；比较性扫描不必选出唯一赢家，可保留基线并说明指标与不确定性。
 
-全部失败且不保留实现时，从开组记录的 `baseline_sha` 恢复本组改动的实现和配置，
+全部失败且不保留实现时，从开组记录的 `baseline_sha`（中途把主分支合进来过的，用最近的同步点）恢复本组改动的实现和配置，
 包括处理基线中不存在的新增文件。逐一核对路径，保留实验记录和输出，不从当前主分支批量覆盖。
 例如 `git restore --source="$baseline_sha" -- train.py config.yaml` 只适用于已核对的对应路径；
 新增、删除、重命名文件另行核对，不把这个示例当成完整恢复清单。
@@ -329,6 +400,7 @@ Codex 的 workspace-write 沙箱把 `.git` 整个设为只读，commit 和 stash
 
 1. 检查源、目标工作区均干净且没有未完成的 merge/rebase/cherry-pick。
    `git worktree list` 显示目标已在其他 worktree 检出时，在那个目录操作，不强行抢占分支。
+   目标目录可能有其他会话在用。合并会改写其中的文件，先确认没有未提交改动，也没有运行正在读取该目录的代码，再合并。
    需要同步远端时，先按项目约定 fetch 并核对分歧；不要用盲目的 pull 改写本地合并计划。
 2. 记录源和目标的完整提交 ID，确认源分支包含本组记录与收尾代码：
 
@@ -340,10 +412,14 @@ Codex 的 workspace-write 沙箱把 `.git` 整个设为只读，commit 和 stash
 
    最后一条退出码 0 表示源已在目标历史中，核对现有结果后跳过重复合并；1 才继续；其他值是错误。
    文件树相同不代表已合并，旧 squash 也不建立源分支的祖先关系。不要自动重写旧历史来修复它。
-3. 切到目标并核对 HEAD 仍是 `target_before`；目标或源已变化就重新审阅，不沿用过期结论：
+3. 到检出目标的目录，核对 HEAD 仍是 `target_before`；目标或源已变化就重新审阅，不沿用过期结论。
+   目标已在某个 worktree 检出时（常见是主目录），在别的目录 `git switch` 会被拒绝
+   （`'main' is already used by worktree at …`），要到那个目录执行；目标没在任何目录检出时才切过去：
 
    ```bash
-   git switch "$target_branch"
+   target_dir=$(git worktree list --porcelain |
+     awk -v b="branch refs/heads/$target_branch" '/^worktree /{d=substr($0,10)} $0==b{print d}')
+   if [ -n "$target_dir" ]; then cd "$target_dir"; else git switch "$target_branch"; fi
    git rev-parse HEAD
    git merge --no-ff --no-commit "$source_sha"
    ```
@@ -369,6 +445,8 @@ Codex 的 workspace-write 沙箱把 `.git` 整个设为只读，commit 和 stash
 通过 `git log --graph --oneline --all` 查看完整历史。**合并后实验分支留不留由你定**，默认保留；
 已提交的失败记录和尝试已是目标分支的祖先，删分支不丢历史。没合并的分支删掉就是丢历史，
 先确认结论已在 CSV 里。stash 中的失败代码仍然只在本地。
+从 worktree 合并的分支（实验和非实验分支都算），合并前后还要处理 worktree 里未入库的数据，步骤见
+[worktree 的合并与删除](references/worktree-merge.md)；worktree 默认保留。
 
 ### 项目有 develop 时
 
@@ -390,22 +468,60 @@ Codex 的 workspace-write 沙箱把 `.git` 整个设为只读，commit 和 stash
 分别标明本地合并和远端推送状态。合并提交 ID 在创建后汇报，不要求把自身 ID 写进该提交。
 上下文恢复时先查 Git 的进行中状态、祖先关系和远端状态，只补未完成步骤，不重复合并或重跑实验。
 
-## 并行跑多组：用 worktree
+## 每组一个 worktree
 
-从已确认的基线创建另一组，而不是隐式继承当前实验的 HEAD：
+创建另一组时使用已确认的基线，不隐式继承当前实验的 HEAD。
+
+**worktree 统一放在父目录里的容器目录。** 容器以项目目录名加 `.worktrees` 命名，如 `proj` 旁边的 `proj.worktrees/`。
+容器内按组路径创建 `proj.worktrees/{部分}/{组}`，与分支、输出、记录对应，也避免不同部分的同名组发生目录冲突。
+不把 worktree 直接放在父目录，以免与其他项目混淆；也不放进项目目录，以免遍历工具读到重复代码。
+项目已有位置约定时沿用。容器不存在时，`git worktree add` 会自动创建：
 
 ```bash
-git worktree add -b exp/badcases/guidance_scale ../proj-guidance "$baseline_sha"
+main_dir=$(git worktree list --porcelain | sed -n '1s/^worktree //p')   # 主目录，proj
+wt_dir="$main_dir.worktrees/badcases/guidance_scale"                     # proj.worktrees/badcases/guidance_scale
+named_dir="$(dirname "$wt_dir")/$(basename "$main_dir")-${wt_dir##*/}"  # 内部名 proj-guidance_scale
+git worktree add -b exp/badcases/guidance_scale "$named_dir" "$baseline_sha"
+git worktree move "$named_dir" "$wt_dir"
 ```
 
 每组一个目录、一个分支、一个 CSV 和独立输出目录，各自维护基线和结论；需要总表时汇总
-`experiments/**/results.csv`。worktree 共享 Git 对象、分支和 stash，不能同时检出同一分支。
-`git worktree remove` 会删除目录；Git 入库只保护已提交的记录，不保护其中的图片和 checkpoint。
-只移除已核对的 worktree，不使用 `--force` 掩盖未保存状态；实验分支记录后可以选择性删除。
+`experiments/**/results.csv`。worktree 之间共享 Git 对象、分支和 stash，同一分支不能同时在两个 worktree 里检出。
+不同组仍可能修改相同代码，合并时照常审阅冲突和行为。主目录里的 `.git/worktrees/<名字>/` 是 Git 给每个 worktree
+记的账（HEAD、索引、日志），不是项目文件，不要手动删改。其中的名字就是内部名 `{项目名}-{组}`（见「一组实验一个分支」里的命名）。
+
+**worktree 里只有入库的文件。** 被 `.gitignore` 忽略的东西不跟分支走：新建的 worktree 里没有主目录的
+忽略文件，worktree 里写的忽略文件合并时也带不回去。`git worktree remove` 会把忽略文件连同目录一起删掉，
+不报错也不提示（未忽略的未跟踪文件反而会拦住删除）。合并在同一路径带进入库文件时，会直接覆盖忽略的同名文件。
+所以 `.gitignore` 只放不该入库的东西：输出（合并时搬进目标目录，见下）、缓存、构建产物和密钥。
+只要记录、结论或后续运行用得到，脚本哪怕只跑一次也入库，放 `temp_scripts/` 并标 `[一次性]`
+（见 `designing-project-layout`）；真正用完即弃的草稿放仓库外。
+
+**新文件先在 worktree 里生成，合并时搬进目标目录，原处留软链接。** git 合并只带走入库文件。
+合并核对无误后，把 worktree 里其余未入库的数据按相同的相对路径搬进签出目标分支的目录，原位置换成指向那里的
+绝对路径软链接。这样数据只在目标目录留一份，worktree 照常读写，之后写进这些位置的内容直接落到目标目录。
+缓存和构建产物留在本地；未忽略的未跟踪文件先入库或补进 `.gitignore`；目标里有内容不同的同名文件就整体停下。
+人批准合并后，由执行合并的 agent 来搬；无人值守时只把演练清单写进交接报告。worktree 里还有会话或运行在写时不搬。
+步骤、脚本和例外见 [worktree 的合并与删除](references/worktree-merge.md)。
+
+记录引用了别组输出、需要在 worktree 里核对时，从主目录软链过来。
+
+**一个 worktree 只服务一组。** 下一组新建目录，不在旧目录里切到新分支，否则目录名会和分支对不上。
+确需沿用旧目录时，用 `git worktree move` 把它移到容器里新组的 `{部分}/{组}` 目录；内部名不会跟着改，仍带着原来的组名。
+
+**worktree 默认保留，只在不再需要时删除：**
+
+- 代码更新后决定从新的基线重新注册同一组（另分出一个 worktree），旧的不再用；
+- 用户要求合并并删除；
+- 用户明确要删某个 worktree。
+
+删除前确认没有会话或运行在用它，并先把未入库的数据搬进目标目录。`git worktree remove` 会连同目录删掉没搬走的
+图片和 checkpoint，而且不报错；不要用 `--force` 掩盖未搬走的文件。步骤见 [worktree 的合并与删除](references/worktree-merge.md)。
+实验分支在记录完成后可以选择性删除。
 
 ## 跑砸了的分支也保留结论
 
 负面结论照样按同一流程 `--no-ff` 合并，message 写清无效的方向和证据。
-合并前把不保留的实现和配置恢复到固定基线，检查相对基线剩余的差异只有记录或明确保留的修改。
+合并前把不保留的实现和配置恢复到固定基线（合进过主分支的，用最近的同步点），检查相对基线剩余的差异只有记录或明确保留的修改。
 这不会删除历史里的失败尝试，也不应覆盖目标分支后来新增的改进。合并后的代码仍需验证。
 只合成功记录会掩盖已排除的方向，让后续实验重复走同一条路。

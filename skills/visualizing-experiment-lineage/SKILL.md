@@ -26,11 +26,18 @@ description: Use when someone wants to see how a set of experiments evolved - wh
    `--scope` 相对记录根目录，可以是部分或组，`.` 表示全部；`--out` 相对项目根，放输出根下，不入库。
    加 `--json` 只打印数据不写页面，用来核对边算得对不对。Python 3.10+ 标准库，不装东西。
 4. 告诉用户页面路径，转述脚本列出的「跑完了却找不到 commit」的行。那是记录纪律的缺口
-   （标题没带 task 名、跑完没提交），修的是记录和提交，不是页面。
+   （提交标题里没有 task 名、正文里也没有它的 `Task:` 行，或者跑完没提交）。要修记录和提交，不要手改页面。
 
 ## 边是怎么来的
 
-一个节点 = 一次决策 = 一个 commit：标题含 task 名、且改了本组 CSV。批量扫描一个 commit 多行，就是一个节点多行。
+一个节点 = 一次决策 = 一个 commit。CSV 的一行配给同时满足下面两条的最早那个 commit：
+
+- 记录了这个 task 的结果：标题里有 task 名，或正文里有一行 `Task: <task名>`（批量提交标题放不下时使用，
+  见 `running-experiments-on-branches`）。正文其他句子里的 task 名不算；例如开组计划中的 task 尚未运行，
+  算入后会把 CSV 行关联到计划提交。
+- 改过本组的 CSV。
+
+批量扫描一个 commit 配多行，就是一个节点多行。
 父 = 沿 first-parent 往上遇到的第一个「带 task 行且改了代码」的 commit：
 
 - 快速迭代的 discard 只提交记录、代码进 stash，下一次 keep 的父跳过它落到上一个 keep。

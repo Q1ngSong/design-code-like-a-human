@@ -47,7 +47,9 @@ tests/                                     自动化正确性检查；不进 lay
   test_pipeline.py                         基线一致性、触发、状态替换
 docs/                                      研究与实现文档，不是代码
 reference-codes/                           上游参考源码，只读、不入库、不上 sys.path，核心不 import 它
-experiments/ablation_study/timesteps.csv   实验记录，入库；路径照 outputs/ 去掉根和叶子
+experiments/ablation_study/timesteps/      实验记录，入库；组路径照 outputs/ 去掉根和叶子
+  results.csv                              一行一次尝试
+  README.md                                本组的问题、结论与限制
 outputs/ablation_study/timesteps/{task}/   实验产物，不入库：config.json、metrics.json、images/ …
 .gitignore                                 含 outputs*/、reference-codes/ 等，模板见 auditing-code-comments 的 references/setup.md
 PROJECT.md                                 给 Agent 的项目说明：研究什么、主体在哪、规矩与边界
@@ -74,7 +76,7 @@ README.md                                  安装、使用和方法说明，给�
   入库的 `vendor/<名>/` 并声明 `vendored`
 - 输出放 `output_roots`（默认 `runs/`）下，`.gitignore` 加 `runs*/`：D2 查这条，但目录还不存在时
   它不报，所以拟树时就写进去。`runs/` 下的路径按 `saving-experiment-outputs` 定，新项目先问
-  那三个问题，树里只填答案；写盘点从一个 `out` 派生（D3 查）。记录放 `experiments/`，入库
+  那三个问题，树里只填答案；写盘点从一个 `out` 派生（D3 查）。记录放 `experiments/{部分}/{组}/results.csv`，入库
   （`recording-experiment-results`）
 - 层不必覆盖所有目录，没进任何层的路径跳过层级校验；宁可少写一层，也不要为了凑齐硬塞
 

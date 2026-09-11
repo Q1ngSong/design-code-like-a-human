@@ -8,7 +8,7 @@ memory 就是可浏览的实验记录和摘要。沿用 CSV、Markdown、原始�
 新组按论文用途组织；已有记录根目录及大小写优先，不为模板强制搬迁。
 
 ```text
-Experiments/                         # 入 Git
+experiments/                         # 入 Git
   README.md                          # 总览：各部分结论、缺口、入口链接
   exploration/                       # 暂未归入论文的探索实验
   main-result/
@@ -59,8 +59,8 @@ outputs/                             # 不入 Git
 以下为虚构路径和指标，执行时替换为真实信息：
 
 ```sh
-python /path/to/recording-experiment-results/scripts/memory.py exp-plan --root /path/to/project --records Experiments --csv main-result/baseline-comparison/results.csv --task method-a_round1 --purpose '与基线比较' --output outputs/baseline-comparison/method-a_round1
-python /path/to/recording-experiment-results/scripts/memory.py exp-finish --root /path/to/project --records Experiments --csv main-result/baseline-comparison/results.csv --task method-a_round1 --metrics 'FID 12.3' --status keep --conclusion '本批开发集改善；补独立验证'
+python /path/to/recording-experiment-results/scripts/memory.py exp-plan --root /path/to/project --records experiments --csv main-result/baseline-comparison/results.csv --task method-a_round1 --purpose '与基线比较' --output outputs/baseline-comparison/method-a_round1
+python /path/to/recording-experiment-results/scripts/memory.py exp-finish --root /path/to/project --records experiments --csv main-result/baseline-comparison/results.csv --task method-a_round1 --metrics 'FID 12.3' --status keep --conclusion '本批开发集改善；补独立验证'
 ```
 
 `--csv` 相对于记录根目录；输出相对于项目根目录。`exp-plan` 创建必要的记录目录及 CSV，
@@ -75,8 +75,8 @@ python /path/to/recording-experiment-results/scripts/memory.py exp-finish --root
 交接或修改摘要后执行只读检查：
 
 ```sh
-python /path/to/recording-experiment-results/scripts/memory.py exp-check --root /path/to/project --records Experiments
-python /path/to/recording-experiment-results/scripts/memory.py exp-check --root /path/to/project --records Experiments --scope main-result/baseline-comparison
+python /path/to/recording-experiment-results/scripts/memory.py exp-check --root /path/to/project --records experiments
+python /path/to/recording-experiment-results/scripts/memory.py exp-check --root /path/to/project --records experiments --scope main-result/baseline-comparison
 ```
 
 `--records` 按实际根目录填写，例如 `experiments`；`--scope` 相对于它，可指定组目录或单个文件。

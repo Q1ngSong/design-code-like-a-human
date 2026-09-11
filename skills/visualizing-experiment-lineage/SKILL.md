@@ -16,12 +16,12 @@ description: Use when someone wants to see how a set of experiments evolved - wh
 
 ## 怎么做
 
-1. 确认记录根目录（`Experiments/`，或项目沿用的名字）和输出根目录（`outputs/`、`runs/`……），
+1. 确认记录根目录（`experiments/`，或项目沿用的名字）和输出根目录（`outputs/`、`runs/`……），
    沿用 `recording-experiment-results` 与 `saving-experiment-outputs` 已经定下的。
 2. 先跑 recording 的 `exp-check`。列结构不对的 CSV 页面会整组跳过并列在页脚：先修记录，别改脚本迁就。
 3. 渲染：
 
-       python /path/to/visualizing-experiment-lineage/scripts/lineage.py --root /path/to/project --records Experiments --scope exploration --out outputs/lineage/exploration.html
+       python /path/to/visualizing-experiment-lineage/scripts/lineage.py --root /path/to/project --records experiments --scope exploration --out outputs/lineage/exploration.html
 
    `--scope` 相对记录根目录，可以是部分或组，`.` 表示全部；`--out` 相对项目根，放输出根下，不入库。
    加 `--json` 只打印数据不写页面，用来核对边算得对不对。Python 3.10+ 标准库，不装东西。

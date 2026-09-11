@@ -391,7 +391,7 @@ def main():
     """命令行入口:读记录 + git,写页面或打印 JSON。[主线]"""
     ap = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     ap.add_argument("--root", default=".", help="项目根目录")
-    ap.add_argument("--records", default="Experiments", help="记录根目录,相对项目根")
+    ap.add_argument("--records", default="experiments", help="记录根目录,相对项目根")
     ap.add_argument("--scope", default="exploration", help="只画这个部分或组,相对记录根")
     ap.add_argument("--out", help="页面路径,相对项目根;默认 outputs/lineage/<scope>.html")
     ap.add_argument("--json", action="store_true", help="只打印数据,不写页面")

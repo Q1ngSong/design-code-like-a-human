@@ -42,7 +42,7 @@ git switch -c "$experiment_branch" "$baseline_sha"
 
     分支    exp/ablation_study/lora_rank
     输出    runs/ablation_study/lora_rank/{task}/
-    记录    experiments/ablation_study/lora_rank.csv
+    记录    experiments/ablation_study/lora_rank/results.csv
 
 这三行里的 `ablation_study/lora_rank`、`runs`、`experiments` 都是默认名（本插件推荐使用）。但是如果项目已经在用自己设计好的实验组路径，就继续沿用现有的路径，避免造成新的理解压力。
 分支目录、输出目录和记录目录下的目录结构必须保持一致，形成统一的实验管理结构，比如三处都用同一个章节 `ablation_study`、`main_results` 作为次一级目录，保证用户能够将分支、输出、记录关联起来。推荐使用章节名进行管理，可以避免相似的实验重名造成的混淆。
@@ -111,12 +111,12 @@ git commit -m "exp: rank8_lr1e-4_round1 —— keep"
        → 新尝试追加一行：填写 task、简介、输出目录，指标、结论留空
 改代码 → 审计（`--base HEAD`，圈出这次的改动）→ 跑
   变好了 → CSV 那行补上 指标，结论 = keep
-           git add -- train.py experiments/ablation_study/lora_rank.csv
+           git add -- train.py experiments/ablation_study/lora_rank/results.csv
            git diff --cached
            git commit -m "exp: lr0.04_bs4_round1 —— keep"
   没变好 → CSV 那行补上 指标，结论 = discard
-           git add experiments/ablation_study/lora_rank.csv
-           git commit --only -m "record: lr0.04_bs4_round1 discard" -- experiments/ablation_study/lora_rank.csv
+           git add experiments/ablation_study/lora_rank/results.csv
+           git commit --only -m "record: lr0.04_bs4_round1 discard" -- experiments/ablation_study/lora_rank/results.csv
            git stash push -u -m "ablation_study/lora_rank/lr0.04_bs4_round1"
            # 先确认剩余改动全属本次尝试；失败代码（含新文件）进 stash，记录留在分支
 ```
@@ -205,7 +205,7 @@ CSV `结论` 列和 `record:` commit 的正文，写的是整个方向为什么�
       lr↑ 放弃（0.04/0.08/0.16，最好 1.003 仍劣于基线 0.998）——
       学习率已在稳定边界，再推只会发散
 
-      git commit --only -m "record: lr0.16_bs4_round1 discard" -m "lr↑ 放弃（0.04/0.08/0.16……）—— 学习率已在稳定边界，再推只会发散" -- experiments/ablation_study/lora_rank.csv
+      git commit --only -m "record: lr0.16_bs4_round1 discard" -m "lr↑ 放弃（0.04/0.08/0.16……）—— 学习率已在稳定边界，再推只会发散" -- experiments/ablation_study/lora_rank/results.csv
 
 三行 discard 各写各的，回头只知道三次都不行，不知道这个方向已经判死，
 下一夜的 agent 会把同一条死路再走一遍。
@@ -399,11 +399,7 @@ git worktree add -b exp/badcases/guidance_scale ../proj-guidance "$baseline_sha"
 ```
 
 每组一个目录、一个分支、一个 CSV 和独立输出目录，各自维护基线和结论；需要总表时汇总
-`experiments/**/*.csv`。worktree 共享 Git 对象和 stash，不能同时检出同一分支。
-不同组仍可能修改相同代码，合并时照常审阅冲突和行为。
-
-**移除 worktree 前先检查产物。** 停止相关进程，把忽略的输出复制到持久目录，验证完整性，
-更新 CSV 中的实际路径并提交，确认代码和记录已保存且本组已按约定合并。
+`experiments/**/results.csv`。worktree 共享 Git 对象、分支和 stash，不能同时检出同一分支。
 `git worktree remove` 会删除目录；Git 入库只保护已提交的记录，不保护其中的图片和 checkpoint。
 只移除已核对的 worktree，不使用 `--force` 掩盖未保存状态；实验分支记录后可以选择性删除。
 

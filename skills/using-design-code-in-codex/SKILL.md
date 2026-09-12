@@ -27,6 +27,7 @@ description: "Codex entry point for design-code-like-a-human. Use in Codex for r
 | 看实验谱系：谁基于谁、哪条路死了 | [visualizing-experiment-lineage](../visualizing-experiment-lineage/SKILL.md) |
 | 刷新索引、审计或判断 finding | [auditing-code-comments](../auditing-code-comments/SKILL.md) |
 | 新项目建目录、填 `layers` | [designing-project-layout](../designing-project-layout/SKILL.md) |
+| 跑别人的代码、复现 baseline | [reproducing-baselines](../reproducing-baselines/SKILL.md) |
 
 ## 十项常用指令及配套操作
 

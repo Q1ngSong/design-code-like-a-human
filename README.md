@@ -217,6 +217,7 @@ Codex 入口集中维护十项指令及配套操作：`/goal`、`/plan`、`/revi
 | 计划、运行或汇总实验 | `recording-experiment-results` | 跑前写计划，跑后补结果与版本关联 |
 | 想看实验谁基于谁、探索到哪了 | `visualizing-experiment-lineage` | 从 CSV 和 git 画一页自顶向下的谱系图 |
 | 功能跑通了想清理 | `auditing-code-comments` | 跑一遍审计,出一份报告 |
+| 跑别人的代码、复现 baseline | `reproducing-baselines` | 论文数字只当参考;跑不起来写入错误报告 |
 
 ### 想主动触发就直接说
 

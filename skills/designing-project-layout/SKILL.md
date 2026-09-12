@@ -46,12 +46,13 @@ tests/                                     自动化正确性检查；不进 lay
   test_rewind.py                           加噪公式、返回时间、背景一致性
   test_pipeline.py                         基线一致性、触发、状态替换
 docs/                                      研究与实现文档，不是代码
-reference-codes/                           上游参考源码，只读、不入库、不上 sys.path，核心不 import 它
+reference_proj/<baseline_name>/            上游参考源码与复现的中间文件，只读、不入库、不上 sys.path，核心不 import 它，跑实验的时候的脚本可能引用它
+BASELINES.md                               每个 baseline 的来源、commit、角色与复现判定，入库；见 reproducing-baselines
 experiments/ablation_study/timesteps/      实验记录，入库；组路径照 outputs/ 去掉根和叶子
   results.csv                              一行一次尝试
   README.md                                本组的问题、结论与限制
 outputs/ablation_study/timesteps/{task}/   实验产物，不入库：config.json、metrics.json、images/ …
-.gitignore                                 含 outputs*/、reference-codes/ 等，模板见 auditing-code-comments 的 references/setup.md
+.gitignore                                 含 outputs*/、reference_proj/ 等，模板见 auditing-code-comments 的 references/setup.md
 PROJECT.md                                 给 Agent 的项目说明：研究什么、主体在哪、规矩与边界
 README.md                                  安装、使用和方法说明，给人看
 ```

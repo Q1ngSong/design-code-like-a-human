@@ -56,11 +56,12 @@ outputs/                             # 不入 Git
 使用本 Skill 的 `scripts/memory.py`，Python 3.10+ 标准库。先从 `--help` 确认当前命令名。
 公开名称集中在脚本的 `COMMANDS`，以后重命名只改映射键并同步本文，不增加通用命令框架。
 
-以下为虚构路径和指标，执行时替换为真实信息：
+以下为虚构路径和指标，执行时替换为真实信息。示例假设这个组是对比组，README 里已经冻结了对照协议：
+对照方是 `method-a` 和 `baseline`，正式测试集是 `data/coco5k/`（没写 N，整个文件夹都要测）。
 
 ```sh
-python /path/to/recording-experiment-results/scripts/memory.py exp-plan --root /path/to/project --records experiments --csv main-result/baseline-comparison/results.csv --task method-a_round1 --purpose '与基线比较' --output outputs/baseline-comparison/method-a_round1
-python /path/to/recording-experiment-results/scripts/memory.py exp-finish --root /path/to/project --records experiments --csv main-result/baseline-comparison/results.csv --task method-a_round1 --metrics 'FID 12.3' --status keep --conclusion '本批开发集改善；补独立验证'
+python /path/to/recording-experiment-results/scripts/memory.py exp-plan --root /path/to/project --records experiments --csv main-result/baseline-comparison/results.csv --task method-a_round1 --purpose 'method-a: 与 baseline 同条件、同调参预算' --output outputs/baseline-comparison/method-a_round1
+python /path/to/recording-experiment-results/scripts/memory.py exp-finish --root /path/to/project --records experiments --csv main-result/baseline-comparison/results.csv --task method-a_round1 --metrics 'FID 12.3 @data/coco5k 全部' --status keep --conclusion '本方正式评测完成；待 baseline 同条件重训评测后比较'
 ```
 
 `--csv` 相对于记录根目录；输出相对于项目根目录。`exp-plan` 创建必要的记录目录及 CSV，
@@ -85,6 +86,21 @@ python /path/to/recording-experiment-results/scripts/memory.py exp-check --root 
 - CSV：标准五列、组内唯一 task、计划和输出路径；完成状态、指标非空及输出目录存在。
   空结论保持未完成，允许尚未创建输出；`summary` 不要求状态前缀或输出叶子同名，可无基线。
 - 输出：普通尝试的叶子与 task 一致；不同记录引用同一目录只警告。局部检查只能发现范围内重复。
+- 对照协议：只在组 README 里有一行 `## 对照协议` 时才查（标题后可带括号注记；代码块里的示例不算）。
+  没有这一节的组不查这些；项目声明了正式测试集、本组却没有协议时，`exp-plan` 提醒一次。
+  - 协议本身：对照方、训练条件、调参、正式测试集四项都要有；对照方至少两个不同的名字；
+    `调参` 整行是三种写法之一。
+  - 沿用的调参次数：来源组必须是用户确认过的相同次数；开组第一次 `exp-plan` 时，
+    来源还必须是记录里最近一次用户确认的组。
+  - 正式测试集：按路径声明，`N` 可选。从本组 README 往上到记录根目录，每一级声明的都要跑；
+    同一路径声明了不同的 `N`（包括一处写了 N、一处没写）报错；N 不是正整数时报错，不会当成全部。
+  - 每一行：`简介` 以对照方的名字开头；keep、discard 的指标对每个正式测试集写 `@路径 N/N`，
+    没写 N 的写 `@路径 全部`（不核对数量）；同一个测试集出现几次，每一次都要这样标；
+    crash、timeout 的指标只能是 `—`。
+  - summary：填了指标，或者任一方已有 keep 或 discard，就要求每一方都有 keep 或 discard；
+    各方次数不同只警告。这一项只有 `exp-check` 查。
+  - 时机：写入命令遇到协议问题直接拒绝写入。`exp-check` 随本组 CSV 一起查协议，
+    `--scope` 只选 README 时不查。
 - Markdown：检查代码块外的内联本地链接，如 `[指标](../../../outputs/a/metrics.json)`；
   相对于 Markdown 文件解析。含空格或括号的路径用 `[标签](<路径>)`。
   不检查远程 URL、锚点、引用式链接或普通文字路径。

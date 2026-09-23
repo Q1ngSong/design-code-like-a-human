@@ -118,7 +118,7 @@ description: Use when running someone else's code to get its numbers - an offici
 
 复现只负责证明这份代码在我们手上能跑。要进论文对比表的那次运行，按实验组重新跑一遍，
 和我们自己的方法用同一套设定、同一套记录，见 `running-experiments-on-branches` 和
-`recording-experiment-results`。`BASELINES.md` 里的数字属于复现阶段，不直接搬进论文。
+`recording-experiment-results`「对比实验：开跑前冻结对照协议」。`BASELINES.md` 里的数字属于复现阶段，不直接搬进论文。
 
 照论文自己重新实现一份，而不是跑别人的代码，那是 `writing-minimal-code` 里
 「复现完整度由规格定」那一节的事。

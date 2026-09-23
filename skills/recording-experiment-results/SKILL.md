@@ -1,6 +1,6 @@
 ---
 name: recording-experiment-results
-description: Use when planning, resuming, finishing, or summarizing experiments - record each task's plan before running, then its metrics, conclusion, output path, and reproducible version references before moving on. 触发场景:实验计划、实验恢复、实验跑完了、记录结果、汇总结果、这组实验的结论、上次那个实验结果呢、新想法和旧方案对比、效果对比。
+description: Use when planning, resuming, finishing, or summarizing experiments - record each task's plan before running, then its metrics, conclusion, output path, and reproducible version references before moving on. 触发场景:实验计划、实验恢复、实验跑完了、记录结果、汇总结果、这组实验的结论、上次那个实验结果呢、新想法和旧方案对比、效果对比、整理结论。
 ---
 
 # 记录实验结果
@@ -142,6 +142,49 @@ rank32_lr1e-4,再翻倍确认拐点,FID 14.1 / CLIP 0.271,"discard：过拟合�
 | 「测试集太大，先报个小规模的结果」 | 小规模的数字只证明代码能跑，不进记录，也不进报告 |
 | 「上次问过调参次数了」 | 每组都问。只有无人值守时才沿用，并标明未确认 |
 
+## 结论整理：收尾存在组里，隔段时间汇总
+
+结论分三层写，各有固定的时机：
+
+| 层级 | 什么时候写 | 写在哪 |
+|---|---|---|
+| 每次尝试 | 跑完就写 | CSV 一行 |
+| 一组的结论 | 组收尾时：问题有了答案、预算用完或决定放弃。中途不写，要汇报就按 CSV 已有的行讲 | 组 README 顶部的「结论」块、CSV 的 summary 行 |
+| 汇总 | 定期整理，见下文 | 总览（记录根目录的 `README.md`） |
+
+**一组的结论**写在组 README 顶部，只写这一组，不去改总览：
+
+```markdown
+## 结论（2026-09-24）
+- 回答：一句话直接回答本组的问题；比较类写清谁比谁好多少
+- 证据：关键数字和出处（task 名、正式测试集、几个种子的均值 ± 标准差、图表路径）
+- 限制：在什么条件下成立，没验证什么
+- 对总览的影响：新增、推翻或加强了总览里的哪一条；没有就写「无」
+- 下一步：接着做什么，或者「结束」
+```
+
+对比组的「回答」写明双方在同一协议下的正式测试集数字；放弃的组写「没有结论，放弃」和原因。
+「对总览的影响」在收尾时写，那时最清楚这组改变了什么。以后整理时只读这一行，就知道总览要加、要换还是不动。
+
+**总览是唯一的集中结论**，汇总这些内容：
+
+- 部分表（`| 部分 | 当前结论 | 尚缺什么 | 实验入口 |`）：每个部分一行，「当前结论」限一两句。谱系页读这张表，格式不改。
+- 表下每个部分列出结论条目：一条一句话，写清结论、关键数字、成立条件（测试集、种子数）和证据链接；
+  论文里用到的注明是哪张表或哪张图。
+- 不写：实验过程和失败细节（在 CSV 和组 README 里）、被推翻的旧说法（直接替换，历史在 git 里）、
+  排除的路线（在 `PROJECT.md` 的「边界」里）。
+
+**什么时候整理**：合并收尾后、要用结论前，在检出目标分支的目录（通常是主目录）里跑一次 `exp-changes`。
+它列出上次整理（主线上最近一个标题以 `record: 整理结论` 开头的提交）之后变了的目录和主线上的提交标题：
+
+    python /path/to/recording-experiment-results/scripts/memory.py exp-changes --root /path/to/project --records experiments
+
+读结论时把总览和这些目录一起看。它提示「建议现在整理」时问用户；无人值守不整理，写进交接报告。
+
+**怎么整理**：看完它列出的每个目录，按各组的「对总览的影响」改总览：新增的加一条，推翻的替换那一条，
+加强的在那条后面补证据链接，「无」就不动。整理完在同一个目录提交 `record: 整理结论 —— <概要>`；
+看过不用改也提交一个空提交，它就是下次对比的起点。
+
 ## 原始证据与实验记忆
 
 以总览和实验组 README 导航，CSV 保存尝试，原始文件保留在输出区；不另建 memory JSON。
@@ -236,7 +279,7 @@ commit 可找 —— 三个月后 CSV 里有这一行,git 里却对不上它跑�
 暂停或取消的未启动计划保留空结果，在 `简介` 注明原因；恢复时先核对是否仍需执行，
 不把从未启动的任务记成 crash，也不把空结果自动视为需要重跑。
 
-这组收尾时（合并前）在 CSV 末尾追加一行总结，随最后一次的 commit 一起提交；
+这组收尾时（合并前）在 CSV 末尾追加一行总结，组 README 顶部写「结论」块（见「结论整理」），随最后一次的 commit 一起提交；
 最后一次已经提交了就再提交一次，不 amend（见 `running-experiments-on-branches`
 的合并前一节）。这一行五列这样填：
 `task` 写 `summary`，`简介` 写胜出的配置，`指标` 写它的指标，

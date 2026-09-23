@@ -2,10 +2,12 @@
 """Register, finish and check experiment records using the standard library."""
 import argparse
 import csv
+from datetime import date
 import os
 import tempfile
 from pathlib import Path
 import re
+import subprocess
 import sys
 from urllib.parse import unquote, urlsplit
 
@@ -365,11 +367,86 @@ def write_experiment(args):
         lock.unlink()
 
 
+CONSOLIDATED = "record: 整理结论"
+
+
+def records_root(args):
+    """Resolve the records directory for exp-changes."""
+    root = args.root.resolve()
+    records = (root / args.records).resolve()
+    if not records.is_dir() or not records.is_relative_to(root):
+        raise ValueError("records must be an existing directory inside root")
+    return records
+
+
+def git(records, *args):
+    """Run git inside records and return stdout; any failure becomes a readable error.
+
+    `--no-optional-locks` keeps `git status` from rewriting the index, so the command stays read-only
+    while other sessions use the same repository.
+    """
+    result = subprocess.run(["git", "--no-optional-locks", "-C", str(records), *args], capture_output=True, text=True)
+    if result.returncode:
+        raise ValueError("git " + args[0] + " failed: " + (result.stderr.strip() or "records must be in a git repository"))
+    return result.stdout
+
+
+def show_changes(args):
+    """List committed changes under records since the last consolidation on the main line. Read-only.
+
+    The last consolidation is the newest first-parent commit whose subject starts with `record: 整理结论`;
+    without one, every committed file counts as not yet consolidated. Paths come NUL-separated so git
+    never escapes non-ASCII names.
+    """
+    records = records_root(args)
+    last = None
+    for line in git(records, "log", "--first-parent", "--format=%H %cs %s").splitlines():
+        sha, day, subject = line.split(" ", 2)
+        if subject.startswith(CONSOLIDATED):
+            last = (sha, day)
+            break
+    if last:
+        fields = git(records, "diff", "--relative", "--no-renames", "--name-status", "-z", last[0], "HEAD", "--", ".")
+        fields = fields.split("\0")
+        kinds = {"A": "新增", "D": "删除"}
+        changed = [(kinds.get(status[0], "改动"), path) for status, path in zip(fields[::2], fields[1::2])]
+    else:
+        tree = git(records, "ls-tree", "-r", "--name-only", "-z", "HEAD", "--", ".")
+        changed = [("未整理", path) for path in tree.split("\0") if path]
+    folders = {}
+    for kind, path in changed:
+        folder, _, name = path.rpartition("/")
+        folders.setdefault(folder, {}).setdefault(kind, []).append(name)
+    if not last:
+        print(f"还没整理过（主线上没有标题以「{CONSOLIDATED}」开头的提交）：{len(folders)} 个目录都算未整理")
+    elif not folders:
+        print(f"上次整理：{last[1]}（{last[0][:7]}）；之后没有变化")
+    else:
+        commits = git(records, "log", "--first-parent", "--format=%cs %s", f"{last[0]}..HEAD", "--", ".").splitlines()
+        print(f"上次整理：{last[1]}（{last[0][:7]}）；之后主线上的提交 {len(commits)} 个：")
+        for line in commits:
+            print(f"  {line}")
+        print(f"有变化的目录 {len(folders)} 个：")
+    for folder, names in folders.items():
+        print(f"  {folder + '/' if folder else '（根目录）'}  " + "；".join(f"{kind} {'、'.join(files)}" for kind, files in names.items()))
+    days = (date.today() - date.fromisoformat(last[1])).days if last else 0
+    if folders and (not last or len(folders) >= 3 or days >= 7):
+        reason = "还没整理过" if not last else f"{len(folders)} 个目录有变化" + (f"，距上次整理 {days} 天" if days else "")
+        print(f"建议现在整理：{reason}")
+    if folders:
+        print(f"整理完提交「{CONSOLIDATED} —— <概要>」；看过不用改就提交空提交：git commit --allow-empty -m "
+              f"\"{CONSOLIDATED} —— 看过，无需修改\"")
+    if git(records, "status", "--porcelain", "--", "."):
+        print("记录根目录下有未提交的改动，没算在内")
+    return 0
+
+
 # Public names live here; rename a key without changing the operation or implementation.
 COMMANDS = {
     "exp-plan": (write_experiment, "plan"),
     "exp-finish": (write_experiment, "finish"),
     "exp-check": (check_experiments, "check"),
+    "exp-changes": (show_changes, "changes"),
 }
 
 
@@ -377,6 +454,7 @@ def main():
     """Parse experiment-specific commands; report failures without modifying old records.
 
     变更: 2026-09-08 check renamed exp-check; added explicit plan and finish writes.
+    变更: 2026-09-23 added exp-changes for periodic conclusion review.
     """
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -388,7 +466,7 @@ def main():
         if operation == "check":
             command.add_argument("--scope", type=Path, help="file/subdirectory relative to records")
             command.add_argument("--limit", type=int, default=20, help="maximum diagnostic lines")
-        else:
+        elif operation in ("plan", "finish"):
             command.add_argument("--csv", type=Path, required=True, help="CSV path relative to records")
             command.add_argument("--task", required=True)
             if operation == "plan":

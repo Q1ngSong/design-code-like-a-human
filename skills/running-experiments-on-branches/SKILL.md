@@ -1,6 +1,6 @@
 ---
 name: running-experiments-on-branches
-description: Use when starting, resuming, or closing a group of experiments, or any other branch worked on in its own worktree (docs, paper, tool) - register the work as a worktree branched from a fixed baseline, record the baseline and results, then preserve history with a no-ff merge into the project's actual target branch. 触发场景:调参、跑实验、做消融、实验结束、实验收尾、合回 master 或 main、实验怎么用 git 管、开 worktree、文档或论文分支合并。
+description: Use when starting, resuming, or closing a group of experiments, or any other branch worked on in its own worktree (docs, paper, tool) - register the work as a worktree branched from a fixed baseline, record the baseline and results, then preserve history with a no-ff merge into the project's actual target branch. 触发场景:调参、跑实验、做消融、多个种子并行训练、实验结束、实验收尾、合回 master 或 main、实验怎么用 git 管、开 worktree、文档或论文分支合并。
 ---
 
 # 实验跑在分支上
@@ -169,6 +169,17 @@ git commit -m "exp: rank8_lr1e-4_round1 —— keep"
 
 顺序：确认工作区干净 → CSV 填写 `task`、`简介` → 改代码 → 运行 → 补齐 `指标`、`结论`
 → 提交代码和 CSV。完成后，工作区应恢复干净。
+
+## 互相独立的运行同时开
+
+多个随机种子、一次批量扫的几组配置、对照组的两方，这些运行互不依赖：**同时开，不要排队一个个跑**，
+它们各自的测试也同时开。比如 3 个种子取平均：3 个训练一起启动，训完 3 个测试一起跑，最后算平均。
+
+开之前先跑几步看显存峰值：这一批的训练和测试各看一次，按最大的算，并留出余量（这个数只用来排卡，不进记录）。
+优先分到空闲的卡上，卡不够再往同一张卡上叠，还放不下就分批。同一张卡上叠着跑会变慢，超时要按同样叠法跑时的耗时判断，
+不能按单独跑时的。每个运行用自己的输出目录和日志，互不覆盖。不要为了多塞几个去改 batch size、精度这些训练条件。
+
+同一批并行的运行算一次决策：全部结束后，再一起补记录、一起提交或 stash。
 
 ## 调优期：快速迭代模式
 
@@ -367,7 +378,7 @@ Codex 的 workspace-write 沙箱把 `.git` 整个设为只读，commit 和 stash
 ## 实验结束：先收尾，再合并
 
 **改主分支的事要人来做，分支上的事自己定。** 无人值守到点（预算用完、清单跑完、被叫停）
-只是停止新增尝试，收尾到合并前一步为止：补齐 CSV、写总结行、收尾 commit、相对目标分支跑一遍审计和验证、
+只是停止新增尝试，收尾到合并前一步为止：补齐 CSV、写总结行和组 README 的结论、收尾 commit、相对目标分支跑一遍审计和验证、
 清除标记、留交接报告。哪怕用户离场前说了「跑完合回去」，也停在这里让人看一眼结果再合；
 是否该合、合到哪，由人看过交接报告后决定，没说就一直留在实验分支上。
 这是唯一要等人的一步。开分支、分支之间合并、回退、删分支、清 stash，无人值守时都自己控制，

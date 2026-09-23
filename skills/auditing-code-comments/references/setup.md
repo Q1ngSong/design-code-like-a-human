@@ -71,6 +71,9 @@ include/exclude、`.gitignore`）遍历磁盘，不看索引；索引只服务�
 runs*/
 # experiments/ 不在这里：实验记录入库，它是结论不是产物
 
+# 上游参考代码与复现的中间文件，不入库；但是他的复现信息汇总文件 BASELINES.md 在根目录，入库
+reference_proj/
+
 # 索引与派生的审计报告,删掉重跑就回来
 .codegraph/
 

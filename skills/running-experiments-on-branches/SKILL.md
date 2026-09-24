@@ -1,6 +1,6 @@
 ---
 name: running-experiments-on-branches
-description: Use when starting, resuming, or closing a group of experiments, or any other branch worked on in its own worktree (docs, paper, tool) - register the work as a worktree branched from a fixed baseline, record the baseline and results, then preserve history with a no-ff merge into the project's actual target branch. 触发场景:调参、跑实验、做消融、多个种子并行训练、实验结束、实验收尾、合回 master 或 main、实验怎么用 git 管、开 worktree、文档或论文分支合并。
+description: Use when starting, resuming, or closing a group of experiments, or any other branch worked on in its own worktree (docs, paper, tool) - register the work as a worktree branched from a fixed baseline, record the baseline and results, then preserve history with a no-ff merge into the project's actual target branch. 触发场景:调参、跑实验、做消融、多个种子并行训练、无人值守跑一夜、实验结束、实验收尾、合回 master 或 main、实验怎么用 git 管、开 worktree、文档或论文分支合并。
 ---
 
 # 实验跑在分支上
@@ -97,7 +97,7 @@ worktree 在 Git 里的内部名（`.git/worktrees/` 下的目录名）统一为
 
 这组要比较两种以上方案（新想法对旧方案），开组时先问用户要不要自动调参、每方案调几次，
 把对照协议写进组 README 并冻结，旧方案在新条件下重训，只报正式测试集的全量结果，
-见 `recording-experiment-results`「对比实验：开跑前冻结对照协议」。
+见 `comparing-methods-fairly`。
 
 开分支的第一个 commit 写清这组要回答什么：
 
@@ -186,7 +186,7 @@ git commit -m "exp: rank8_lr1e-4_round1 —— keep"
 上面的提交方式用于**构建期**：用户参与每次决策，失败尝试的代码也提交到分支中，供用户审阅。
 
 对比组（组 README 冻结了对照协议）不用这一节：调参预算按协议，候选留在调参日志里，每方案记一行，
-见 `recording-experiment-results`「对比实验：开跑前冻结对照协议」。
+见 `comparing-methods-fairly`。
 
 **快速迭代由用户授权开启，由用户叫停。** 默认是开放搜索：下一步试什么由你自己规划，网格是临时的，
 按下文的趋势判断换方向，跑到用户叫停或约定预算（比如一夜）用完。只有用户明确给了固定清单时，
@@ -306,18 +306,13 @@ CSV `结论` 列和 `record:` commit 的正文，写的是整个方向为什么�
 为了让同方向的行能对上，`简介` 以方向开头：`lr↑: 0.08，上次 0.04 无效再推一档`。
 同前缀的行连着看，趋势就在眼前。
 
-**用户可以重新选择此前 discard 的尝试。** 例如，主要指标稍差，但曲线更稳、代码更简单，
-或另一项指标更好。先按完整实验路径找到 stash 的对象 ID，为这次取回分配新的 task，
-填写 CSV 的计划和输出目录；简介注明「人工改判取回 <原task>」及用户的取舍理由，再执行：
+**用户可以重新选择此前 discard 的尝试**（比如主要指标稍差，但曲线更稳、代码更简单）。分配新的 task，
+用 `git stash apply <对象ID>` 取回，当作新尝试重新跑；原记录保留。完整步骤见[无人值守与恢复](references/unattended-and-recovery.md)「取回 discard 的尝试」。
 
-    git stash apply <对象ID>
-
-`apply` 将旧改动应用到当前代码，并不恢复当时的完整实验状态。解决冲突后，即使没有
-文本冲突，也要**作为新尝试重新运行**，按运行结果和用户的选择补齐 keep 或 discard。
-保留原记录，它描述的是当时的结果。
-
-**开启时创建标记，停止时删除。** 标记用于在上下文压缩后恢复模式。下面以 `runs/` 为例；
-有多个输出根目录时，先逐一确认均被忽略，且 `git ls-files -- <输出目录>` 没有已入库产物，再创建标记：
+**无人值守只在用户明确说要离开、让你自己跑时才开启**：「我去睡了」「跑一夜」算，「继续」「好」不算，拿不准就问一句。
+开启前确认宿主处于免审批模式，并做完 Git 检查再创建标记：有多个输出根目录时逐一确认都被忽略，
+且 `git ls-files -- <输出目录>` 没有已入库产物；`.codegraph/` 里的文件也要被忽略，否则 discard 时的
+`stash push -u` 会把标记一起收走。以 `runs/` 为例：
 
     if git check-ignore -q runs/; then
         mkdir -p .codegraph &&
@@ -328,50 +323,14 @@ CSV `结论` 列和 `record:` commit 的正文，写的是整个方向为什么�
         false
     fi
 
-开启前必须确认输出区已被 Git 忽略，否则宽范围暂存可能提交 checkpoint，
-discard 时的 `stash push -u` 会将未跟踪的输出存入 stash，并从工作区移除。D2 虽然能报告
-这个问题，但它属于文件级告警，不会标为 `changed=true`，仅查看本次改动时会漏掉它。
-因此要在进入无人值守模式前补齐 `.gitignore`。
+用户叫停、回来重新参与决策、约定预算用完或固定清单跑完时停止：`rm .codegraph/unattended`，再跑一次
+`refresh.py`，回到构建期。无人值守时不提出要用户回答的问题，也不提前给最终总结；缺少授权或无法安全恢复时，
+保留现场并说明阻碍。24 小时有效期、宿主免审批怎么设、为什么这样检查，
+见[无人值守与恢复](references/unattended-and-recovery.md)「开启和停止无人值守」。
 
-落哨兵前还要确认宿主处于免审批模式：Claude Code 开自动模式（或 `--dangerously-skip-permissions`）；
-Codex 的 workspace-write 沙箱把 `.git` 整个设为只读，commit 和 stash 都会撞沙箱，必须由用户以
-`--sandbox danger-full-access` 启动（细节见入口技能 `using-design-code-in-codex` 的 `/permissions`）。
-否则第一条需要审批的命令就会把你挂到天亮。
-
-创建 `.codegraph/.gitignore` 是为了忽略该目录中的文件，防止 stash 将无人值守标记收走，
-导致后续运行误判模式。codegraph 会创建这个忽略文件，因此这里只在文件缺失时写入。
-
-**只在用户明确说要离开、让你自己跑时才落这个文件**——「开始迭代」「我去睡了」
-「跑一夜」算；「继续」「好」「行」不算，那是对上一步的回应，不是授权离场。
-拿不准就问一句「要我无人值守跑吗」，这一问值得。停止时 `rm .codegraph/unattended`，
-再跑一次 `refresh.py`——`audit.json` 的 `unattended` 是审计那一刻的快照，不会自己翻回 false。
-**文件存在且距修改时间不足 24 小时，标记才有效**；
-`refresh.py` 把它写进 `audit.json` 的 `unattended` 字段，hook 在每次会话开始
-（含压缩之后）输出提示。这两处是读取时的快照；可能过时时，检查标记是否存在及修改时间。
-24 小时有效期用于避免遗留标记长期生效，文件中的分支名仅供人查看。
-
-**不要因改动类型而切换模式。** 调整参数和修改架构都可在快速迭代中进行。用户叫停或重新参与决策、
-约定预算耗尽、或用户给的固定清单跑完时，按停止步骤清除标记，回到构建期。
-单纯没有收到回复不代表获得了无人值守授权。
-
-**无人值守任务尚未完成且可以继续时，继续执行，不要提前给出最终总结并结束当前轮次。**
-将实验决策写入 commit message 或 CSV，便于之后回查。无人值守时按既定规则处理，
-不要提出需要用户回答的问题，再把沉默当成同意。缺少必需信息或授权、无法安全恢复时，
-保留现场并说明阻碍，不把持续重试当作进展。
-
-**上下文压缩后，从本地记录恢复。** 检查无人值守标记的存在与修改时间，再查看当前分支、
-最近提交、本组 CSV、stash 列表和对应输出目录。恢复期间先核对已有进程或任务状态；
-上下文压缩不代表实验进程已停止。CSV 的 `summary` 是组总结，不作为待恢复的实验行。
-
-- **结论为空**：记录尚未完成。尚未启动的计划里，用户明确暂停或取消过的不自动重跑，其余照常自己安排。
-  进程仍在运行就继续跟踪；确认正常结束后补齐指标和结论。
-  若确认中断且无法恢复，记录 `crash` 及原因，按 discard 顺序提交 CSV，再用包含完整
-  实验路径的 message 保存代码改动。不能仅凭指标文件存在就认定运行完成。
-- **结论已填，但提交或存档未完成**：核对本组记录对应的 commit；discard、crash、timeout
-  还要核对对应 stash。只补做未完成的步骤，不重复提交已有记录。没有代码差异时无需 stash，
-  以 CSV 中的说明为准；有差异却找不到 stash 时，先核对工作区，不能假定已存档。
-- **本次尝试已完整收尾，工作区仍有其他改动**：查清来源后，按 `recording-experiment-results`
-  的无关改动处理方式提交成 `chore:`，不能只因记录齐全就认定剩余改动无关。
+**上下文压缩后，从本地记录恢复**：先查标记、当前分支、最近提交、本组 CSV、stash 列表和输出目录，
+再核对进程是否还在跑。按 CSV 那行的结论判断上次走到哪一步，只补未完成的步骤，
+见[无人值守与恢复](references/unattended-and-recovery.md)「上下文压缩后恢复」。
 
 未完成尝试的代码不能提交成 `chore:`，否则会混入后续尝试使用的基线。
 

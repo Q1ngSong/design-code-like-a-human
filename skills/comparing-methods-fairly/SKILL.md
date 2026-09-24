@@ -1,6 +1,6 @@
 ---
 name: comparing-methods-fairly
-description: Use when an experiment group compares two or more approaches - a new idea against the previous method, or ours against a baseline - freeze the comparison protocol before running - shared training conditions, an equal tuning budget the user confirms each time, and only full formal-test-set results count. 触发场景:新想法和旧方案对比、效果对比、和 baseline 比、对照实验、旧方案要不要重训、调参预算、正式测试集。
+description: Use when an experiment group compares two or more approaches - a new idea against the previous method, or ours against a baseline - freeze the comparison protocol before running - shared training conditions, an equal tuning budget the user confirms whenever the group trains or tunes, and only full formal-test-set results count. 触发场景:新想法和旧方案对比、效果对比、和 baseline 比、对照实验、旧方案要不要重训、调参预算、正式测试集。
 ---
 
 # 公平对比：开跑前冻结对照协议
@@ -32,18 +32,25 @@ description: Use when an experiment group compares two or more approaches - a ne
 只让新方案按新条件训练，比出来的差距分不清来自方法还是来自条件，而且不会报错。
 所以每一方都要在本组按协议的条件重新跑，在本组 CSV 里至少有一行 keep 或 discard。
 
-## 调参：每组都问用户
+## 调参：要训练或调参的组，每组都问用户
 
-每开一组对比，都先问用户两件事：要不要自动调参；要的话，每方调几次。上一组问过，这一组也要再问。
+这组要训练或调参时，开组先问用户两件事：要不要自动调参；要的话，每方调几次。上一组问过，这一组也要再问。
+只在开组时问一次：同一组里调完参、进入正式测试集评测时，不再问。用户开组时已经说了打算
+（「不用调参」「每方调 10 次」），就算问过了，照着写进协议并注明日期，不再追问。
 双方的调参次数必须相同，旧方案不能因为以前调过就少调或不调。
 
-用户的回答写进 `调参` 这一行，只能是下面三种写法之一：
+**只评测已冻结的方法（不训练、不调参）不问调参**，用 `evaluating-frozen-methods`，`调参` 写 `只评测，不调参`。
+我们自己方法的新旧版本放在一起比，就得来自同一份训练条件，不是就按上文「旧方案也要重训」处理；
+外部 baseline 可以用官方或复现的权重，见 `evaluating-frozen-methods`。
+
+`调参` 这一行只能是下面四种写法之一：
 
 | 写法 | 什么时候用 |
 |---|---|
 | `每方自动调参 20 次（用户 2026-09-23 确认）` | 用户给了次数 |
 | `不调参（用户 2026-09-23 确认）` | 用户说不调参 |
 | `沿用 main-result/mlp_gate 的每方 30 次，未确认` | 无人值守，问不到人 |
+| `只评测，不调参` | 这组只评测已冻结的方法，不训练也不调参，见 `evaluating-frozen-methods` |
 
 沿用只能照抄记录里**最近一次**用户确认的那组的次数；那组确认的是不调参，就写 `沿用 <组> 的不调参，未确认`。
 用了沿用，这组的结论里也要写明次数未经用户确认。记录里从来没有用户确认过的次数，这组对比就不开跑：
@@ -64,7 +71,7 @@ description: Use when an experiment group compares two or more approaches - a ne
 正式测试集通常在 `experiments/README.md` 里声明一次，写法和协议里那一行相同：写路径；只测其中一部分时
 加 `N=数量`（只写正整数），不写 N 就是整个路径都要测。声明在哪一级 README，这一级下面的所有组都要跑它。
 项目的历史记录里已经定好的测试集直接沿用，不自己另选。组里可以再加测试集，但不能替换上级声明的，
-也不能改它的 `N`，包括给没写 N 的测试集加上 N。
+也不能改它的 `N`，包括给没写 N 的测试集加上 N。只评测的组例外，见 `evaluating-frozen-methods`。
 
 `指标` 里用声明的路径标明每个正式测试集都跑满了：
 
@@ -109,3 +116,4 @@ description: Use when an experiment group compares two or more approaches - a ne
 | 「旧方案以前调好了，这次只调新的」 | 调参次数不对等，新方案赢了也说明不了什么。同等次数 |
 | 「测试集太大，先报个小规模的结果」 | 小规模的数字只证明代码能跑，不进记录，也不进报告 |
 | 「上次问过调参次数了」 | 每组都问。只有无人值守时才沿用，并标明未确认 |
+| 「只是评测，拿旧版本现成的权重直接测」 | 自己方法的新旧版本要来自同一份训练条件，不是就重训；外部 baseline 可以用官方或复现的权重 |

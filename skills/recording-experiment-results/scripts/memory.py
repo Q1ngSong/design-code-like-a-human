@@ -21,6 +21,7 @@ PROTOCOL_HEADING = re.compile(r"^##[ \t]*对照协议(?:[ \t]*[（(][^）)\n]*[�
 BUDGET = r"(?:每方(?:自动调参)?\s*(?P<n>\d+)\s*次|不调参)"
 CONFIRMED = re.compile(BUDGET + r"\s*[（(]用户\s*(?P<date>\d{4}-\d{2}-\d{2})\s*确认[）)]")
 INHERITED = re.compile(r"沿用\s*(?P<src>\S+?)\s*的\s*" + BUDGET + r"\s*[，,]\s*未确认")
+EVALUATION_ONLY = re.compile(r"只评测[，,]\s*不调参(?:\s*[（(][^）)]*[）)])?")
 
 
 def unfenced(text):
@@ -56,10 +57,13 @@ def protocol_fields(text):
     return dict(FIELD.findall(section))
 
 
-def formal_test_sets(folder, records):
+def formal_test_sets(folder, records, own_first=False):
     """Collect 正式测试集 as {path: N or None} from folder up to records.
 
     None means the whole path is tested. A lower level may add a set, never change one declared above.
+    With `own_first` (an evaluation-only group), sets declared in the group itself replace the inherited ones.
+
+    变更: 2026-09-24 evaluation-only groups may evaluate on their own benchmarks instead of the inherited sets.
     """
     sets, problems = {}, []
     while folder.is_relative_to(records):
@@ -76,22 +80,27 @@ def formal_test_sets(folder, records):
             path, size = declared[1].rstrip("/") or "/", size and int(size[0])
             if sets.setdefault(path, size) != size:
                 problems.append(f"正式测试集 {path} 被声明了不同的 N，只能保留一个")
+        if own_first and (sets or problems):
+            break
         folder = folder.parent
     return sets, problems
 
 
 def tuning_problem(line, records, latest=False):
-    """Why a 调参 line is none of the three accepted forms; None when it is one.
+    """Why a 调参 line is none of the accepted forms; None when it is one.
 
     A reused budget must come from a user confirmation under records. `latest` is checked only when
     the group is opened, so a later confirmation elsewhere never invalidates a frozen protocol.
+    `只评测，不调参` needs no confirmation: the group only evaluates frozen methods.
+
+    变更: 2026-09-24 accept `只评测，不调参` for groups that neither train nor tune.
     """
-    if CONFIRMED.fullmatch(line.strip()):
+    if CONFIRMED.fullmatch(line.strip()) or EVALUATION_ONLY.fullmatch(line.strip()):
         return None
     inherited = INHERITED.fullmatch(line.strip())
     if not inherited:
         return ("调参只能写成「每方自动调参 N 次（用户 YYYY-MM-DD 确认）」「不调参（用户 YYYY-MM-DD 确认）」"
-                "或「沿用 <组> 的每方 N 次，未确认」")
+                "「沿用 <组> 的每方 N 次，未确认」，只评测已冻结的方法时写「只评测，不调参」")
     confirmed = {}
     for readme in records.rglob("README.md"):
         answer = CONFIRMED.fullmatch((protocol_fields(readme_text(readme.parent)) or {}).get("调参", "").strip())
@@ -112,11 +121,12 @@ def read_protocol(csv_path, records, opening=False):
         return None
     problems = [f"缺少「{name}」" for name in ("对照方", "训练条件", "调参") if name not in fields]
     arms = [arm for arm in re.split(r"[,，、\s]+", fields.get("对照方", "")) if arm]
-    if "对照方" in fields and (len(arms) < 2 or len(set(arms)) < len(arms)):
-        problems.append("对照方要写至少两个不同的名字")
+    evaluation_only = bool(EVALUATION_ONLY.fullmatch(fields.get("调参", "").strip()))
+    if "对照方" in fields and (len(arms) < (1 if evaluation_only else 2) or len(set(arms)) < len(arms)):
+        problems.append("对照方要写至少两个不同的名字（只评测的组可以只有一个）")
     if "调参" in fields and (issue := tuning_problem(fields["调参"], records, latest=opening)):
         problems.append(issue)
-    test_sets, set_problems = formal_test_sets(csv_path.parent, records)
+    test_sets, set_problems = formal_test_sets(csv_path.parent, records, own_first=evaluation_only)
     if not test_sets and not set_problems:
         set_problems = ["缺少「正式测试集」（写法：- 正式测试集: <路径>，只测一部分时加 N=数量）"]
     return {"readme": csv_path.parent / "README.md", "problems": problems + set_problems,

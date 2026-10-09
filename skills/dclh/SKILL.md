@@ -1,6 +1,6 @@
 ---
 name: dclh
-description: "DCLH / dclh：design-code-like-a-human 插件的跨宿主统一入口。用户说「dclh + 任务」「用 dclh …」或要求使用本插件时触发，涵盖科研代码编写、注释、审计、实验输出、分支和结果记录。Use when the user requests dclh or DCLH workflows in Codex, Claude Code, or another Agent Skills host."
+description: "DCLH / dclh：design-code-like-a-human 插件的跨宿主统一入口。用户说「dclh + 任务」「用 dclh …」或要求使用本插件时触发，涵盖科研代码编写、注释、审计、实验输出、分支和结果记录，以及软件项目的主页与发布。Use when the user requests dclh or DCLH workflows in Codex, Claude Code, or another Agent Skills host."
 ---
 
 # DCLH
@@ -27,6 +27,7 @@ description: "DCLH / dclh：design-code-like-a-human 插件的跨宿主统一入
 | 刷新索引、审计或判断 finding | [auditing-code-comments](../auditing-code-comments/SKILL.md) |
 | 新项目建目录、填 `layers` | [designing-project-layout](../designing-project-layout/SKILL.md) |
 | 跑别人的代码、复现 baseline | [reproducing-baselines](../reproducing-baselines/SKILL.md) |
+| 做项目主页、发布新版本、打 tag、应用自动更新、检查发布结果 | [releasing-github-projects](../releasing-github-projects/SKILL.md) |
 
 只有 `dclh` 而没有任务时，沿用当前已明确的任务；没有明确任务则询问要处理什么。
 调用简称本身不代表开始实验、创建 goal 或新建对话。

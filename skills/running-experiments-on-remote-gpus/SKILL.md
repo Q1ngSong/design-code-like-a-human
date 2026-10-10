@@ -1,9 +1,9 @@
 ---
 name: running-experiments-on-remote-gpus
-description: Use when running experiments on a rented remote Linux GPU machine with a fixed rental deadline - measure the machine, deploy a fixed commit, assign jobs to GPUs, and pull every generated file back to the local machine with hash verification before the machine is released. 触发场景:租了显卡或云服务器、把实验搬到云端跑、云端环境部署、远程服务器怎么操作、数据同步回本地、释放机器前、本地和云端一起跑、云端结果合并回项目。
+description: Use when running experiments on one or more remote Linux GPU machines, rented with a deadline or not - decide which machine is the primary workstation, measure each remote machine, deploy a fixed commit, assign jobs to GPUs, and pull every generated file back to the primary workstation with hash verification before a machine is released. 触发场景:租了显卡或云服务器、把实验搬到云端跑、云端环境部署、远程服务器怎么操作、控制多台服务器、主服务器和辅助服务器、数据同步回本地或主服务器、释放机器前、本地和云端一起跑、云端结果合并回项目。
 ---
 
-# 在租来的 GPU 机器上跑实验
+# 在远程 GPU 机器上跑实验
 
 本技能只管"换一台机器跑"多出来的部分。分支与 worktree 见
 [running-experiments-on-branches](../running-experiments-on-branches/SKILL.md)，输出路径见
@@ -11,19 +11,41 @@ description: Use when running experiments on a rented remote Linux GPU machine w
 [recording-experiment-results](../recording-experiment-results/SKILL.md)。
 
 - 命令：[references/remote-operations.md](references/remote-operations.md)（下称"手册"）。
-- 脚本（`scripts/`）：`sync_remote_outputs.py` 回传；`sync_loop.ps1` 周期回传；
+- 脚本（`scripts/`）：`sync_remote_outputs.py` 回传；`sync_loop.ps1` / `sync_loop.sh` 周期回传（Windows / Linux）；
   `run_until_done.sh` 单卡重试启动；`wait_then_start.sh` 排队启动。
 
 术语：
+- **主工作站**：存放项目正本（主检出、接收 worktree、台账）的那一台机器，只有一台。它是用户的电脑，
+  或一台长期保留的服务器。当前会话必须运行在主工作站上；下文的"本地"都指主工作站。
+- **计算机器**：主工作站之外用来跑任务的每一台服务器，下文也称"远端"。它们只存放代码检出、输入和
+  自己产生的输出，不存放正本；它们之间不互相传数据。
 - **任务项**：一个可独立重跑的最小工作（如一个样本的全部输出、一组超参数的一次训练）。
   它有唯一编号、自己的输出目录和可由程序判定的完成条件。
 - **完成标记**：任务项目录里的一个文件。任务项的其余文件全部写完后才写它（或它的内容才达到规定长度）；
   重跑一个任务项之前先删除它的目录。
-- **写入者**：会向远端输出目录或日志目录写文件的进程，包括会重新拉起任务的启动器和排队脚本。
+- **写入者**：会向计算机器的输出目录或日志目录写文件的进程，包括会重新拉起任务的启动器和排队脚本。
 - **接收 worktree**：见第 3 节。
 
-操作方式：不依赖 SSH 连接存活。短操作用一次性的非交互 `ssh`；长任务和排队脚本在远端的
-`screen` 会话里运行。
+操作方式：主工作站通过 `ssh` 操作每台计算机器，不依赖 SSH 连接存活。短操作用一次性的非交互 `ssh`；
+长任务和排队脚本在计算机器的 `screen` 会话里运行。
+
+## 0. 确定主工作站
+
+开始前向用户确认哪台机器是主工作站，并核对当前会话就运行在它上面（`hostname` 与用户说的一致）。
+
+- 用户只有自己的电脑和计算机器：主工作站是用户的电脑。
+- 用户有一台长期保留的服务器，另有临时的计算机器：主工作站是那台长期服务器，数据从计算机器直接
+  传到它，不经过用户的电脑。当前会话若运行在用户的电脑上，先停下，请用户把会话开到那台服务器上
+  （Claude 桌面应用的 SSH 环境，或在服务器上运行命令行版），再继续；本插件也要安装在那台服务器上。
+- 主工作站访问每台计算机器用在主工作站上生成的专用密钥，不把别的机器的私钥复制过来。
+
+所有汇总都在主工作站上做：每台计算机器的输出各自回传到主工作站，合并结果、评测、写台账只在主工作站进行。
+有多台计算机器时，对每一台分别执行第 1–5 节，并遵守：
+
+- 每台计算机器一份回传配置，`state_dir` 各不相同（如 `_remote_sync_<机器名>`）。
+- 一个任务项只分配给一台机器；分配表（哪些任务项编号归哪台机器）写进实验记录后再启动。
+- 同一实验组的多台机器检出同一分支的同一提交，回传到同一个接收 worktree；不同实验组各用各的。
+- 每台机器的释放时间分别倒推，分别做最终回传。
 
 ## 1. 先确认期限和范围
 
@@ -32,17 +54,19 @@ description: Use when running experiments on a rented remote Linux GPU machine w
 - 释放时间（含时区），以及释放后远端数据是否保留。未确认时按"释放即全部丢失"处理。
 - 必须取回的范围：列出每个远端目录。每个输出根对应一份回传配置；日志和环境记录放进配置的日志目录。
   明确列出不取回的目录名（如临时缓存）。
-- 超期方案：到期跑不完时，是续租、砍掉哪些任务，还是把哪些步骤改到本地做。
+- 超期方案：到期跑不完时，是续租、砍掉哪些任务，还是把哪些步骤改到主工作站做。
+- 计算机器没有释放期限时，本节的三个时刻不适用，其余各节照做；回传仍然周期进行。
 
 从释放时间倒推三个时刻：**停止启动新任务**、**停止全部写入者**、**开始最终回传**。
 最终回传的预留时间 = 待传字节数 ÷ 实测下行吞吐 + 两端各重算一遍全部哈希的时间，再加一倍余量用于重试。
 
 ## 2. 测量机器，再定方案
 
-安装任何东西之前先测量并记录（手册第 2 节）：
+对每台计算机器，安装任何东西之前先测量并记录（手册第 2 节）：
 
 - GPU 数量、显存、驱动版本；数据盘挂载点与可用容量；CPU 核数与内存上限。
-- 上行吞吐、单连接下行吞吐、多连接下行吞吐。回传并发数取多连接测试中全部成功的最大连接数。
+- 主工作站到它的上行吞吐、单连接下行吞吐、多连接下行吞吐。回传并发数取多连接测试中全部成功的最大连接数；
+  同时从多台计算机器回传时，各自的并发数之和不超过这个值。
 - 实际要用的包源和模型源能否下载（下载一个真实的小文件，不是只访问首页）。
 - 不挂 GPU 时的内存上限，以及挂卸 GPU 是否重启实例。会重启时，挂卸前先停掉全部写入者。
 - 远端是否有 `git`、`screen`、`tar`、`pgrep`、`timeout`、`nvidia-smi` 和 Python 3.8 以上。
@@ -51,7 +75,7 @@ description: Use when running experiments on a rented remote Linux GPU machine w
 
 ## 3. 部署一个固定提交
 
-- 为这次远端运行在本地新开一个分支和 worktree，称为**接收 worktree**。远端检出同一分支。
+- 为这次远端运行在主工作站新开一个分支和 worktree，称为**接收 worktree**。远端检出同一分支。
   代码只从它部署出去；远端结果只回传到它自己的输出目录（真实目录，不是指向主检出输出目录的链接）。
   主检出的代码和输出目录在整个远端运行期间不被写入。
 - 远端代码是该分支某个提交的 git 检出。禁止在远端改源码；要改就在接收 worktree 提交后重新部署，
@@ -61,11 +85,11 @@ description: Use when running experiments on a rented remote Linux GPU machine w
 - 已提交的脚本里不出现机器相关的绝对路径；根目录和解释器由调用方通过参数、环境变量或 `PATH` 传入。
 - 远端输出目录的相对结构与接收 worktree 一致。
 - 依赖：在远端按 Linux 可安装的版本建环境，把 `pip freeze`、Python、torch、CUDA 构建、驱动版本
-  写进远端日志目录，并记下与本地环境的差异。挂上 GPU 后跑一次真实的 GPU 计算确认可用。
+  写进远端日志目录，并记下与主工作站环境的差异。挂上 GPU 后跑一次真实的 GPU 计算确认可用。
 - 输入文件（权重、数据集、不在 git 里的上游代码）按"哪个任务先启动就先传它的依赖"排序；
   一个任务的全部输入传完并通过 SHA-256 比对后，才启动该任务。
-- 从本地已有的部分结果续跑（唯一允许手工写接收 worktree 输出目录的情形，只在远端首次启动前做）：
-  1. 停掉本地写这些结果的进程并核对进程列表。
+- 从主工作站已有的部分结果续跑（唯一允许手工写接收 worktree 输出目录的情形，只在远端首次启动前做）：
+  1. 停掉主工作站上写这些结果的进程并核对进程列表。
   2. 把结果目录复制到接收 worktree 的输出目录，删除其中未完成的任务项目录。
   3. 上传到远端同一相对路径，两端比对 SHA-256。
   4. 启动远端任务，确认它跳过了已完成的任务项。
@@ -82,14 +106,14 @@ description: Use when running experiments on a rented remote Linux GPU machine w
 - 后续任务的自动启动用 `wait_then_start.sh`，并给等待设超时。
 - 每次检查进度时：吞吐 = 新增完成任务项数 ÷ 经过时间；剩余时间 = 剩余任务项数 ÷ 吞吐。
   算出的结束时间晚于第 1 节的"停止全部写入者"时刻，就执行已确认的超期方案。
-- 本地 GPU 可承担不依赖远端的步骤（如对已回传结果的评测）。本地任务读取接收 worktree 里已完成的
+- 主工作站的 GPU 可承担不依赖远端的步骤（如对已回传结果的评测）。这类任务读取接收 worktree 里已完成的
   任务项，结果写到接收 worktree 之外的输出目录。同一任务项同一时间只由一台机器计算。
 - 停止任务的顺序：先停排队脚本和重试启动器，再停任务进程。之后核对完整进程列表和显存占用；
   只结束启动器时，它的子进程可能仍在运行并继续写输出。
 
 ## 5. 回传
 
-用 `scripts/sync_remote_outputs.py`，配置和调用见手册第 8 节。从第一批任务项完成起周期运行，不等到最后。
+在主工作站上运行 `scripts/sync_remote_outputs.py`，配置和调用见手册第 8 节。从第一批任务项完成起周期运行，不等到最后。
 它的行为：
 
 - 只取完成标记有效的任务项，以及不属于任何任务项目录的文件；未完成的任务项目录不取。
@@ -99,7 +123,8 @@ description: Use when running experiments on a rented remote Linux GPU machine w
   `<状态目录>/logs/` 和 `<状态目录>/unfinished/` 里是远端文件的副本，每轮直接替换。
 - 失败的文件在本轮内最多重试两次；仍未同步的逐个列出，退出码非零。
 - 同一时间只有一轮在运行。
-- 符号链接、Windows 无法保存的文件名、仅大小写不同的两个路径不被取回，逐个列出并使本轮以非零退出。
+- 符号链接不被取回；主工作站是 Windows 时，Windows 无法保存的文件名和仅大小写不同的两个路径也不被取回。
+  这些条目逐个列出并使本轮以非零退出。
   出现时在远端改名或加入排除目录，再重跑。
 
 首次真实回传前先 `--dry-run`，核对待取文件数、任务项匹配数和将被移走的本地文件清单
@@ -107,14 +132,14 @@ description: Use when running experiments on a rented remote Linux GPU machine w
 
 最终回传：
 
-1. 本地创建周期回传的停止文件，等循环日志出现 `LOOP STOPPED`。
+1. 在主工作站创建周期回传的停止文件，等循环日志出现 `LOOP STOPPED`。
 2. 按第 4 节的顺序停掉远端全部写入者，核对进程列表。之后不再启动任何写入者。
 3. 运行 `--final`。它不使用哈希缓存，取回剩余全部文件（未完成的任务项放到 `<状态目录>/unfinished/`），
    然后再取一次远端清单，与第一次逐文件比对。
 4. 退出码为 0 且最后一行以 `SYNC VERIFIED FINAL` 开头，并且第 1 节列出的每个必取目录都被某份配置覆盖，
    才告知用户可以释放机器。
 5. 其他结果一律不释放：退出码 6 表示仍有写入者，回到第 2 步；退出码 1 时按输出列出的文件处理后重跑；
-   退出码 3 时先腾出本地磁盘。
+   退出码 3 时先腾出主工作站的磁盘。
 
 ## 6. 与主分支的数据冲突
 
@@ -127,5 +152,6 @@ description: Use when running experiments on a rented remote Linux GPU machine w
 
 ## 7. 记录
 
-在实验记录中增加：远端机器标识、提交 SHA、环境版本与本地的差异、哪些任务项在哪台机器上生成、
+在实验记录中增加：主工作站是哪台机器、每台计算机器的标识、提交 SHA、环境版本与主工作站的差异、
+哪些任务项在哪台机器上生成、
 接收 worktree 中 `<状态目录>/manifest.jsonl` 的路径。远端运行配置里的绝对路径保持原样。

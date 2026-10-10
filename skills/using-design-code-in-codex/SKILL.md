@@ -30,7 +30,7 @@ description: "Codex entry point for design-code-like-a-human. Use in Codex for r
 | 刷新索引、审计或判断 finding | [auditing-code-comments](../auditing-code-comments/SKILL.md) |
 | 新项目建目录、填 `layers` | [designing-project-layout](../designing-project-layout/SKILL.md) |
 | 跑别人的代码、复现 baseline | [reproducing-baselines](../reproducing-baselines/SKILL.md) |
-| 把实验搬到租来的 GPU 机器上跑：部署、排任务、回传、释放前收尾 | [running-experiments-on-remote-gpus](../running-experiments-on-remote-gpus/SKILL.md) |
+| 在远程 GPU 机器上跑实验（一台或多台）：定主工作站、部署、分配 GPU、回传、释放前收尾 | [running-experiments-on-remote-gpus](../running-experiments-on-remote-gpus/SKILL.md) |
 | 做项目主页、发布新版本、打 tag、应用自动更新、检查发布结果 | [releasing-github-projects](../releasing-github-projects/SKILL.md) |
 
 ## 十项常用指令及配套操作

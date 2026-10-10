@@ -1,7 +1,9 @@
 # 远程服务器操作命令
 
-本地为 Windows + Git Bash，远端为 Linux + bash。每个 bash 代码块假定已执行第 1 节的变量定义
-（每次新开 shell 都要重新执行）。尖括号内是必须替换的值，替换后不保留尖括号。
+所有命令都在主工作站上执行（SKILL.md 第 0 节），"远端"指被操作的那台计算机器。主工作站可以是
+Windows + Git Bash 或 Linux；计算机器是 Linux + bash。标注"仅 Windows"的内容在主工作站是 Linux 时跳过。
+每个 bash 代码块假定已执行第 1 节的变量定义（每次新开 shell 都要重新执行；每台计算机器一组变量）。
+尖括号内是必须替换的值，替换后不保留尖括号。
 
 ## 1. 变量与连接
 
@@ -70,7 +72,7 @@ put    <本地输入根> "$DISK/<远端输入目录>" <相对路径> <相对路�
 verify <本地输入根> "$DISK/<远端输入目录>" <相对路径> <相对路径>
 ```
 
-- `verify` 的相对路径不能含空格。`sed` 去掉 Git Bash 的 `sha256sum` 在文件名前加的 `*`，使两端输出格式一致。
+- `verify` 的相对路径不能含空格。`sed` 去掉 Git Bash（仅 Windows）的 `sha256sum` 在文件名前加的 `*`，使两端输出格式一致；在 Linux 上它不改变输出。
 - 只传任务实际加载的文件；同一权重的其他格式或精度副本不传。
 - 多条流并行：每条流是一个顺序执行若干 `put` 的脚本，各自在本地后台运行。
 - 传输中断的目录不可用：重新 `put`，`verify` 输出 `UPLOAD_VERIFIED` 后才启动依赖它的任务。
@@ -182,7 +184,8 @@ r 'date "+%F %T %Z"
     sleep 60
   done
   ```
-- 停止本地任务后核对进程和显存；仍有输出时按 PID 结束，直到两条命令都无输出：
+- 停止主工作站上的任务后核对进程和显存；仍有输出时按 PID 结束，直到两条命令都无输出。
+  主工作站是 Linux 时用第 5 节的 `ps` 和 `nvidia-smi` 命令；是 Windows 时：
 
   ```powershell
   Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match '<脚本名>' } | Select-Object ProcessId, ParentProcessId, CommandLine
@@ -191,7 +194,7 @@ r 'date "+%F %T %Z"
 
 ## 8. 回传工具
 
-`scripts/sync_remote_outputs.py` 只依赖本地 Python 3.8 以上的标准库和 `ssh`。项目相关的内容全部写在一个
+`scripts/sync_remote_outputs.py` 在主工作站上运行，只依赖 Python 3.8 以上的标准库和 `ssh`。每台计算机器一份配置。项目相关的内容全部写在一个
 JSON 配置里。模板 `scripts/sync_config.example.json` 中的每个值都是示例，必须逐项替换：
 
 | 键 | 含义 |
@@ -199,9 +202,9 @@ JSON 配置里。模板 `scripts/sync_config.example.json` 中的每个值都是
 | `host` `port` `key` `known_hosts` | 连接参数，同第 1 节。路径可用 `~` |
 | `remote_python` | 远端任意 Python 3.8 以上解释器的绝对路径，用来生成清单 |
 | `remote_root` | 远端输出根的绝对路径 |
-| `local_root` | 接收 worktree 的输出目录，Windows 绝对路径，用 `/` 分隔（如 `D:/repo-wt/outputs`） |
+| `local_root` | 主工作站上接收 worktree 的输出目录，绝对路径，用 `/` 分隔（如 `D:/repo-wt/outputs` 或 `/data/repo-wt/outputs`） |
 | `remote_logs` | 可选。远端日志目录的绝对路径，递归取回到 `<state_dir>/logs/` |
-| `state_dir` | `local_root` 下存放回传状态的单层目录名，默认 `_remote_sync`。远端输出根的顶层不能有同名条目 |
+| `state_dir` | `local_root` 下存放回传状态的单层目录名，默认 `_remote_sync`。多台计算机器回传到同一个 `local_root` 时各用不同的名字。远端输出根的顶层不能有同名条目 |
 | `units` | 任务项规则列表，见下 |
 | `exclude_dirs` | 输出根内任何层级上同名的目录都不取回 |
 | `writer_pattern` | `pgrep -f` 正则，须匹配远端全部写入者的命令行（任务脚本、评测脚本、`run_until_done`、`wait_then_start`），且不匹配 `bash`、`sshd` 这类常驻进程 |
@@ -254,16 +257,22 @@ python scripts/sync_remote_outputs.py <配置.json> --final     # 最终回传
 
 限制：不属于任何任务项目录的文件在远端被删除后，本地副本保留。
 
-周期回传。路径含空格时须像下面这样在单引号内再加双引号；创建停止文件后，循环在当前一轮结束后
-10 秒内退出并在日志写 `LOOP STOPPED`；本机休眠期间不运行，关机后需重新启动：
+周期回传：创建停止文件后，循环在当前一轮结束后 10 秒内退出并在日志写 `LOOP STOPPED`。
+主工作站休眠期间循环不运行，关机后需重新启动。启动后查看日志，确认出现第一轮的 `SYNC` 行。
+
+主工作站是 Linux：
+
+```bash
+screen -dmS sync_<机器名> bash -c 'bash scripts/sync_loop.sh <python> <配置.json> <停止文件> > <日志> 2>&1'
+```
+
+主工作站是 Windows（路径含空格时须像下面这样在单引号内再加双引号）：
 
 ```powershell
 Start-Process powershell -WindowStyle Hidden -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass',
   '-File','"<路径>\sync_loop.ps1"','-Python','"<python.exe>"','-Config','"<配置.json>"','-StopFile','"<停止文件>"' `
   -RedirectStandardOutput '<日志>' -RedirectStandardError '<错误日志>'
 ```
-
-启动后查看 `<日志>`，确认出现第一轮的 `SYNC` 行。
 
 ## 9. 现象与检查项
 
@@ -272,7 +281,7 @@ Start-Process powershell -WindowStyle Hidden -ArgumentList '-NoProfile','-Execut
 | 远端进程退出码 137 | `dmesg` 或平台监控里的内存事件；第 2 节的内存上限 |
 | `screen` 会话全部消失 | `uptime` 显示的开机时间是否晚于任务启动时间 |
 | 远端 `.sh` 报 `\r` 或 `bad interpreter` | 脚本换行是否为 LF（第 4 节） |
-| Git Bash 的 `tar` 报 `Cannot connect to C:` | 路径写成 `/c/...`，或加 `--force-local` |
+| Git Bash 的 `tar` 报 `Cannot connect to C:`（仅 Windows） | 路径写成 `/c/...`，或加 `--force-local` |
 | 回传某轮退出码 1 且列出 `batch incomplete` | 下一轮是否收敛；连续两轮不收敛则减小 `workers` |
 | 同卡两个任务都变慢 | 重新测吞吐，判断是否只是分时（SKILL.md 第 4 节） |
-| 本地输出目录在任务停止后仍在增长 | 本地进程列表（第 7 节） |
+| 主工作站的输出目录在任务停止后仍在增长 | 主工作站的进程列表（第 7 节） |

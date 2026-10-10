@@ -1,6 +1,6 @@
 """Pull the outputs generated on a remote machine into the same relative paths locally, hash-verified. [基础设施]
 
-Run on the local machine, repeatedly while remote jobs are running, and once with `--final` after they stop.
+Run on the primary workstation (Windows or Linux), repeatedly while remote jobs are running, and once with `--final` after they stop.
 Everything project-specific comes from a JSON config (see sync_config.example.json).
 
 What one pass does:
@@ -15,8 +15,9 @@ What one pass does:
 - `--final` ignores both hash caches, also fetches unfinished units into `<state_dir>/unfinished/`, and succeeds
   only if no writer process is running and a second remote listing is identical to the first.
 
-Not supported, reported and counted as not synced: symbolic links, names that Windows cannot store, two remote
-paths that differ only by letter case, a remote top-level entry named like `state_dir`.
+Not supported, reported and counted as not synced: symbolic links; a remote top-level entry named like
+`state_dir`; and, when this machine runs Windows, names Windows cannot store and two remote paths that differ only
+by letter case.
 
 Exit codes: 0 synced (or dry-run finished), 1 some files not synced or the remote changed during --final,
 2 bad command line, 3 not enough local disk, 4 another pass is running, 5 crashed, 6 --final refused.
@@ -159,16 +160,19 @@ def sha256_file(path):
 
 
 def unstorable(rels):
-    """清单里本地(Windows)无法无损保存的相对路径及原因。[基础设施]
+    """清单里这台机器无法无损保存的相对路径及原因。[基础设施]
 
     Returns:
-        {rel: 原因}:含反斜杠或 `..`、含 Windows 非法字符或保留名、以点或空格结尾、与另一路径仅大小写不同。
+        {rel: 原因}。任何系统:含 `..` 或空段。仅 Windows:含反斜杠或其他非法字符、保留名、以点或空格结尾、
+        与另一路径仅大小写不同。
     """
     bad, folded = {}, {}
     for rel in rels:
         parts = rel.split("/")
-        if "\\" in rel or ".." in parts or "" in parts:
+        if ".." in parts or "" in parts:
             bad[rel] = "path escapes or is malformed"
+        elif os.name != "nt":
+            continue
         elif any(set(p) & WINDOWS_BAD or p.split(".")[0].lower() in WINDOWS_RESERVED or p[-1] in ". " for p in parts):
             bad[rel] = "name not storable on Windows"
         elif folded.setdefault(rel.lower(), rel) != rel:

@@ -1,6 +1,6 @@
 ---
 name: using-design-code-in-codex
-description: "Codex entry point for design-code-like-a-human. Use in Codex for research-code changes, comment audits, experiment planning, unattended iteration, or experiment-session recovery. Select the shared skills and relevant native capabilities, including explicitly requested goals. Not for Claude Code. 触发场景：在 Codex 中使用本插件、科研开发、注释审计、跑实验、无人值守、恢复实验任务。"
+description: "Codex entry point for design-code-like-a-human. Use in Codex for research-code changes, comment audits, experiment planning, unattended iteration, experiment-session recovery, or GitHub project pages and releases. Select the shared skills and relevant native capabilities, including explicitly requested goals. Not for Claude Code. 触发场景：在 Codex 中使用本插件、科研开发、注释审计、跑实验、无人值守、恢复实验任务、发布新版本。"
 ---
 
 # Codex 入口
@@ -24,10 +24,14 @@ description: "Codex entry point for design-code-like-a-human. Use in Codex for r
 | 确定实验输出目录 | [saving-experiment-outputs](../saving-experiment-outputs/SKILL.md) |
 | 开实验组（注册 worktree）、迭代、恢复或收尾；文档、论文、工具分支的 worktree 与合并 | [running-experiments-on-branches](../running-experiments-on-branches/SKILL.md) |
 | 写计划、指标、失败或组总结 | [recording-experiment-results](../recording-experiment-results/SKILL.md) |
+| 新想法和旧方案对比、和 baseline 比：开跑前冻结对照协议 | [comparing-methods-fairly](../comparing-methods-fairly/SKILL.md) |
+| 方法和权重已定型，只评测：最终数字、补测 benchmark | [evaluating-frozen-methods](../evaluating-frozen-methods/SKILL.md) |
 | 看实验谱系：谁基于谁、哪条路死了 | [visualizing-experiment-lineage](../visualizing-experiment-lineage/SKILL.md) |
 | 刷新索引、审计或判断 finding | [auditing-code-comments](../auditing-code-comments/SKILL.md) |
 | 新项目建目录、填 `layers` | [designing-project-layout](../designing-project-layout/SKILL.md) |
 | 跑别人的代码、复现 baseline | [reproducing-baselines](../reproducing-baselines/SKILL.md) |
+| 在远程 GPU 机器上跑实验（一台或多台）：定主工作站、部署、分配 GPU、回传、释放前收尾 | [running-experiments-on-remote-gpus](../running-experiments-on-remote-gpus/SKILL.md) |
+| 做项目主页、发布新版本、打 tag、应用自动更新、检查发布结果 | [releasing-github-projects](../releasing-github-projects/SKILL.md) |
 
 ## 十项常用指令及配套操作
 

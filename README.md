@@ -31,7 +31,7 @@
 
 ## 这个项目做什么
 
-一个给科研原型代码加工程纪律的 Claude Code / Codex 插件。
+一个给科研原型代码加工程纪律的 Claude Code / Codex 插件，也管软件项目的主页和发布。
 它按问题发生的时间,把处理方式分成两类。
 
 **已经写下的代码,用审计规则查。** 一条命令生成审计报告,定位到文件和行号:
@@ -215,9 +215,13 @@ Codex 入口集中维护十项指令及配套操作：`/goal`、`/plan`、`/revi
 | 写会存文件的脚本 | `saving-experiment-outputs` | 动手前先说好输出存哪儿 |
 | 开始、恢复或结束一组实验；在文档、论文、工具分支上干活 | `running-experiments-on-branches` | 从固定基线开分支和 worktree，人看过结果、说合并后用 `--no-ff` 合回实际目标 |
 | 计划、运行或汇总实验 | `recording-experiment-results` | 跑前写计划，跑后补结果与版本关联 |
+| 比较新想法和旧方案，或和 baseline 比 | `comparing-methods-fairly` | 开跑前冻结对照协议：同一训练条件、同等调参次数、只认正式测试集跑满的结果 |
+| 方法定型后评测：论文最终数字、补测 benchmark | `evaluating-frozen-methods` | 不训练、不调参；写清权重来源，每个 benchmark 跑满，同一套评测 |
 | 想看实验谁基于谁、探索到哪了 | `visualizing-experiment-lineage` | 从 CSV 和 git 画一页自顶向下的谱系图 |
 | 功能跑通了想清理 | `auditing-code-comments` | 跑一遍审计,出一份报告 |
 | 跑别人的代码、复现 baseline | `reproducing-baselines` | 论文数字只当参考;跑不起来写入错误报告 |
+| 要在远程 GPU 机器上跑实验（租来的或自有的，一台或多台） | `running-experiments-on-remote-gpus` | 先定主工作站；远端检出同一提交；按显存分配 GPU；结果周期回传到主工作站的专用 worktree，逐文件校验哈希后才释放机器 |
+| 做项目主页、发布新版本 | `releasing-github-projects` | README 渲染成主页；一条脚本改版本号、打 tag，Actions 直接发正式 Release；发完逐项核对 |
 
 ### 想主动触发就直接说
 
@@ -374,6 +378,11 @@ D1 说「核心层依赖了脚本层」，C1 要分清改的是别人依赖的�
 | `recording-experiment-results` | 实验计划、恢复、结果与总结 | 6 |
 | `running-experiments-on-branches` | 实验开组、恢复、收尾与合并 | 6、8 |
 | `visualizing-experiment-lineage` | 看方法探索的谱系：谁基于谁、哪条路死了 | 6 |
+| `running-experiments-on-remote-gpus` | 在远程 GPU 机器上跑实验、把结果取回主工作站 | 7、8 |
+| `comparing-methods-fairly` | 新想法和旧方案对比、和 baseline 比，开跑前 | — |
+| `evaluating-frozen-methods` | 方法定型后只评测：最终数字、补测 benchmark | — |
+| `reproducing-baselines` | 跑别人的代码、复现 baseline | — |
+| `releasing-github-projects` | 做项目主页、发布新版本 | — |
 
 `writing-minimal-code` 是一条四道决策流：该不该存在 → 能不能改现有的 →
 新写的话代码从哪来 → 写成什么样。

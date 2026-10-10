@@ -23,6 +23,8 @@ while [ "$root" != "/" ]; do
 
 写代码前走一遍 writing-minimal-code 的四道决策；docstring 的格式见
 writing-python-comments。功能跑通后用 auditing-code-comments 审计。
+跑实验：分支与 worktree 见 running-experiments-on-branches；要在远程 GPU 机器上跑、再把结果取回主工作站，
+见 running-experiments-on-remote-gpus。其余技能见 dclh 的任务对照表。
 
 审计命令（技能里写的是相对技能目录的 ../../scripts/refresh.py，这是绝对路径）：
 

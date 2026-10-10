@@ -1,0 +1,18 @@
+{
+  "host": "root@example-host",
+  "port": 22,
+  "key": "~/.ssh/rented_box",
+  "known_hosts": "~/.ssh/known_hosts_rented_box",
+  "remote_python": "/data/envs/exp/bin/python",
+  "remote_root": "/data/repo/outputs",
+  "local_root": "D:/project-worktrees/remote-run/outputs",
+  "remote_logs": "/data/logs",
+  "state_dir": "_remote_sync",
+  "units": [
+    {"glob": "*/*/item_*", "done_file": "log.json", "json_len": 51},
+    {"glob": "*/*_eval", "done_file": "summary.json"}
+  ],
+  "exclude_dirs": [".cache"],
+  "writer_pattern": "scripts/(train|evaluate|run_until_done|wait_then_start)",
+  "workers": 32
+}

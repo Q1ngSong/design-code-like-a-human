@@ -27,6 +27,7 @@ description: "DCLH / dclh：design-code-like-a-human 插件的跨宿主统一入
 | 刷新索引、审计或判断 finding | [auditing-code-comments](../auditing-code-comments/SKILL.md) |
 | 新项目建目录、填 `layers` | [designing-project-layout](../designing-project-layout/SKILL.md) |
 | 跑别人的代码、复现 baseline | [reproducing-baselines](../reproducing-baselines/SKILL.md) |
+| 把实验搬到租来的 GPU 机器上跑：部署、排任务、回传、释放前收尾 | [running-experiments-on-remote-gpus](../running-experiments-on-remote-gpus/SKILL.md) |
 | 做项目主页、发布新版本、打 tag、应用自动更新、检查发布结果 | [releasing-github-projects](../releasing-github-projects/SKILL.md) |
 
 只有 `dclh` 而没有任务时，沿用当前已明确的任务；没有明确任务则询问要处理什么。
